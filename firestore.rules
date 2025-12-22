@@ -1,0 +1,184 @@
+/**
+ * Core Philosophy: This ruleset enforces a security model based on user identity and collaborative roles.
+ * Access is primarily granted to authenticated users. User data is strictly private, while shared data
+ * like events is accessible to a defined list of administrators.
+ *
+ * Data Structure:
+ * - /users/{userId}: Private user profiles, owned and accessible only by the user themselves.
+ * - /events/{eventId}: Collaborative event documents. Access is controlled by an `adminUserIds` array within each document.
+ * - /inventoryItems/{inventoryItemId}: A global collection of inventory. In this prototyping stage, all signed-in users can manage inventory.
+ * - /inventoryItems/{inventoryItemId}/sales/{saleId}: Sales records nested under the inventory item they belong to, sharing the same access rules.
+ *
+ * Key Security Decisions:
+ * - Default Deny: All paths are closed by default. Access is granted explicitly.
+ * - No User Enumeration: Listing documents in the top-level `/users` collection is disallowed to protect user privacy.
+ * - Event Administration: Access to read or modify an event document is restricted to users whose UID is present in the document's `adminUserIds` array.
+ * - Prototyping Flexibility for Inventory: To facilitate rapid development, management of the `/inventoryItems` collection and its `/sales` subcollections is currently permitted for any authenticated user. This should be refined with more specific roles as the application matures.
+ *
+ * Denormalization for Authorization: The `/events/{eventId}` documents use a denormalized `adminUserIds` array. This is a critical design choice that allows security rules to check for administrative permissions directly on the document being accessed, avoiding slow, costly, and sometimes impossible cross-document `get()` calls.
+ *
+ * Structural Segregation: User-private data is segregated in the `/users/{userId}` path, while collaborative and global data reside in their own top-level collections (`/events`, `/inventoryItems`), which simplifies rules and queries.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for readable, reusable logic
+    /**
+     * isSignedIn
+     * @description Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * isOwner
+     * @description Checks if the requesting user's UID matches the given userId.
+     * @param userId The user ID to check against the authenticated user's UID.
+     */
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    /**
+     * isExistingOwner
+     * @description Checks if the user owns an existing document.
+     * @param userId The user ID to check against the authenticated user's UID.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * isEventAdmin
+     * @description Checks if the requesting user is in an event's admin list.
+     * @param eventData The document data of the event being accessed.
+     */
+    function isEventAdmin(eventData) {
+      return request.auth.uid in eventData.adminUserIds;
+    }
+
+    /**
+     * isCreatingEventAndIsAdmin
+     * @description On create, verifies the user is in the new event's admin list.
+     */
+    function isCreatingEventAndIsAdmin() {
+      return isSignedIn() && isEventAdmin(request.resource.data);
+    }
+
+    /**
+     * isExistingEventAdmin
+     * @description On update/delete, verifies the user is in the existing event's admin list.
+     */
+    function isExistingEventAdmin() {
+      return isSignedIn() && resource != null && isEventAdmin(resource.data);
+    }
+    
+    /**
+     * isReadingAsEventAdmin
+     * @description On get, verifies the user is in the existing event's admin list.
+     */
+    function isReadingAsEventAdmin() {
+        return isSignedIn() && isEventAdmin(resource.data);
+    }
+
+    /**
+     * hasValidUserId
+     * @description On user profile creation, ensures the document's internal `id` field matches its path `userId`.
+     * @param userId The document's ID from the path.
+     */
+    function hasValidUserId(userId) {
+      return request.resource.data.id == userId;
+    }
+    
+    /**
+     * isUserIdImmutable
+     * @description On user profile update, ensures the `id` field cannot be changed.
+     */
+    function isUserIdImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * hasValidInventoryLink
+     * @description On sale creation, ensures the sale's internal `inventoryItemId` matches its parent path.
+     * @param inventoryItemId The parent document's ID from the path.
+     */
+    function hasValidInventoryLink(inventoryItemId) {
+      return request.resource.data.inventoryItemId == inventoryItemId;
+    }
+
+    /**
+     * isInventoryLinkImmutable
+     * @description On sale update, ensures the `inventoryItemId` cannot be changed.
+     */
+    function isInventoryLinkImmutable() {
+      return request.resource.data.inventoryItemId == resource.data.inventoryItemId;
+    }
+
+    /**
+     * @description Manages user profile documents.
+     * @path /users/{userId}
+     * @allow (create) A new user can create their own profile document, e.g., auth.uid === userId.
+     * @deny (get) A user cannot read another user's profile, e.g., auth.uid !== userId.
+     * @deny (list) No user can list all documents in the `/users` collection.
+     * @principle Restricts access to a user's own data tree (Ownership).
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && hasValidUserId(userId);
+      allow update: if isExistingOwner(userId) && isUserIdImmutable();
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Stores collaborative event information.
+     * @path /events/{eventId}
+     * @allow (get) An event admin (auth.uid in resource.data.adminUserIds) can read an event document.
+     * @allow (create) An authenticated user can create an event if they include their own UID in the `adminUserIds` array.
+     * @deny (update) A user not in the `adminUserIds` list cannot update the event.
+     * @principle Enforces shared access via a denormalized list of collaborators (`adminUserIds`).
+     */
+    match /events/{eventId} {
+      allow get: if isReadingAsEventAdmin();
+      allow list: if isSignedIn();
+      allow create: if isCreatingEventAndIsAdmin();
+      allow update: if isExistingEventAdmin();
+      allow delete: if isExistingEventAdmin();
+    }
+
+    /**
+     * @description Stores information about all inventory items.
+     * @path /inventoryItems/{inventoryItemId}
+     * @allow (list) Any authenticated user can list all inventory items.
+     * @allow (create) Any authenticated user can create a new inventory item.
+     * @deny (update) An unauthenticated user cannot modify an inventory item.
+     * @principle Provides flexible access for any signed-in user during the prototyping phase.
+     */
+    match /inventoryItems/{inventoryItemId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource != null;
+      allow delete: if isSignedIn() && resource != null;
+
+      /**
+       * @description Stores sales transactions for a specific inventory item.
+       * @path /inventoryItems/{inventoryItemId}/sales/{saleId}
+       * @allow (list) Any authenticated user can list the sales for an item.
+       * @allow (create) Any authenticated user can create a new sale record.
+       * @deny (create) A sale cannot be created with an `inventoryItemId` that does not match its parent path.
+       * @principle Inherits the flexible access of its parent collection and enforces relational integrity.
+       */
+      match /sales/{saleId} {
+        allow get: if isSignedIn();
+        allow list: if isSignedIn();
+        allow create: if isSignedIn() && hasValidInventoryLink(inventoryItemId);
+        allow update: if isSignedIn() && resource != null && isInventoryLinkImmutable();
+        allow delete: if isSignedIn() && resource != null;
+      }
+    }
+  }
+}

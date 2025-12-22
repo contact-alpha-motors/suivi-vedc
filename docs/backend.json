@@ -1,0 +1,219 @@
+{
+  "entities": {
+    "Event": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Event",
+      "type": "object",
+      "description": "Represents an event with associated location, dates, and administrators.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Event entity."
+        },
+        "location": {
+          "type": "string",
+          "description": "The location of the event."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "The starting date and time of the event.",
+          "format": "date-time"
+        },
+        "endDate": {
+          "type": "string",
+          "description": "The ending date and time of the event.",
+          "format": "date-time"
+        },
+        "adminUserIds": {
+          "type": "array",
+          "description": "References to User entities who are administrators for this event. (Relationship: Event 1:N User)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "location",
+        "startDate",
+        "endDate"
+      ]
+    },
+    "InventoryItem": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "InventoryItem",
+      "type": "object",
+      "description": "Represents an item in the initial stock, such as books or calendars.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the InventoryItem entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "The name of the item."
+        },
+        "description": {
+          "type": "string",
+          "description": "A description of the item."
+        },
+        "unitPrice": {
+          "type": "number",
+          "description": "The unit price of the item."
+        },
+        "initialStockQuantity": {
+          "type": "number",
+          "description": "The initial quantity of the item in stock."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "description",
+        "unitPrice",
+        "initialStockQuantity"
+      ]
+    },
+    "Sale": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Sale",
+      "type": "object",
+      "description": "Represents a sale transaction.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Sale entity."
+        },
+        "inventoryItemId": {
+          "type": "string",
+          "description": "Reference to InventoryItem. (Relationship: InventoryItem 1:N Sale)"
+        },
+        "quantitySold": {
+          "type": "number",
+          "description": "The quantity of the item sold in this transaction."
+        },
+        "saleTimestamp": {
+          "type": "string",
+          "description": "The date and time when the sale occurred.",
+          "format": "date-time"
+        },
+        "remainingStock": {
+          "type": "number",
+          "description": "The remaining stock of the item after the sale."
+        }
+      },
+      "required": [
+        "id",
+        "inventoryItemId",
+        "quantitySold",
+        "saleTimestamp",
+        "remainingStock"
+      ]
+    },
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the User entity."
+        },
+        "username": {
+          "type": "string",
+          "description": "The username of the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "The email address of the user.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "username",
+        "email"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles.  Uses path-based ownership for private user data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier of the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/events/{eventId}",
+        "definition": {
+          "entityName": "Event",
+          "schema": {
+            "$ref": "#/backend/entities/Event"
+          },
+          "description": "Stores event information. Includes denormalized 'adminUserIds' array for authorization independence. Allows listing of all events for authorized users.",
+          "params": [
+            {
+              "name": "eventId",
+              "description": "The unique identifier of the event."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/inventoryItems/{inventoryItemId}",
+        "definition": {
+          "entityName": "InventoryItem",
+          "schema": {
+            "$ref": "#/backend/entities/InventoryItem"
+          },
+          "description": "Stores information about inventory items. Allows listing of all inventory items for authorized users.",
+          "params": [
+            {
+              "name": "inventoryItemId",
+              "description": "The unique identifier of the inventory item."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/inventoryItems/{inventoryItemId}/sales/{saleId}",
+        "definition": {
+          "entityName": "Sale",
+          "schema": {
+            "$ref": "#/backend/entities/Sale"
+          },
+          "description": "Stores sales transactions for each inventory item. This is a subcollection under inventory items, enforcing hierarchical ownership.",
+          "params": [
+            {
+              "name": "inventoryItemId",
+              "description": "The unique identifier of the inventory item."
+            },
+            {
+              "name": "saleId",
+              "description": "The unique identifier of the sale."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "To support the Suivi d'Inventaire VEDC application, the Firestore data structure is designed with a focus on offline capabilities, security, and scalability, adhering to the principles of Authorization Independence, Structural Segregation, and Access Modeling. Given the offline requirement, we will be using Firestore's offline persistence capabilities, meaning writes will be cached locally and then synchronized when the device is online.\n\n**Explanation:**\n\n*   **/users/{userId}**: This path stores user-specific data. It ensures private user data and leverages path-based ownership. \n*   **/events/{eventId}**: This collection stores event data. The `adminUserIds` array within each event document serves as the source of truth for authorization, enabling secure `list` operations (QAPs) and eliminating the need for complex rules or `get()` calls.\n*   **/inventoryItems/{inventoryItemId}**: This collection stores inventory item data. This enables listing all inventory items without complex filtering rules (QAPs).\n*   **/inventoryItems/{inventoryItemId}/sales/{saleId}**: This subcollection stores sale transactions for each inventory item. This utilizes hierarchical paths for user-owned data. This enables listing all sales transactions for a given item without complex filtering rules (QAPs).\n\n**Authorization Independence:**\n\n*   The design achieves authorization independence by storing access control information (e.g., `adminUserIds` in events) directly within the documents where access control is required. This avoids `get()` calls in security rules, simplifying the rules and improving performance and reliability. It allows atomic creation of parent/child documents.\n\n**QAPs (Rules are not Filters):**\n\n*   The structural segregation, especially the dedicated `/events` and `/inventoryItems` collections allows for simple list operations based on ownership or roles without needing complex filtering in the rules. The `adminUserIds` field within each event is critical for securing list operations based on the user's role as an administrator."
+  }
+}
