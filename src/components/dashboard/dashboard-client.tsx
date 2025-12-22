@@ -34,6 +34,7 @@ import {
 import { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import Link from 'next/link';
 
 type DashboardClientProps = {
   items: Item[];
@@ -82,6 +83,33 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
     .sort((a,b) => a.date.getTime() - b.date.getTime())[0];
   }, [events]);
 
+  const UpcomingEventCard = () => (
+    <Card className={upcomingEvent ? 'bg-accent/50 hover:bg-accent/70 transition-colors' : ''}>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">Prochain Événement</CardTitle>
+        <Calendar className="h-4 w-4 text-muted-foreground" />
+        </CardHeader>
+        <CardContent>
+        {upcomingEvent ? (
+            <>
+            <div className="text-lg font-bold">{upcomingEvent.name}</div>
+            <p className="text-xs text-muted-foreground">
+                {format(upcomingEvent.date, 'dd MMMM yyyy', { locale: fr })} à {upcomingEvent.location}
+            </p>
+            </>
+        ) : (
+            <>
+            <div className="text-lg font-bold">Aucun</div>
+            <p className="text-xs text-muted-foreground">
+                Aucun événement à venir
+            </p>
+            </>
+        )}
+        </CardContent>
+    </Card>
+    );
+
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -126,29 +154,14 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
             </p>
           </CardContent>
         </Card>
-        <Card className={upcomingEvent ? 'bg-accent/50' : ''}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Prochain Événement</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            {upcomingEvent ? (
-                <>
-                <div className="text-lg font-bold">{upcomingEvent.name}</div>
-                <p className="text-xs text-muted-foreground">
-                    {format(upcomingEvent.date, 'dd MMMM yyyy', { locale: fr })} à {upcomingEvent.location}
-                </p>
-                </>
-            ) : (
-                <>
-                <div className="text-lg font-bold">Aucun</div>
-                <p className="text-xs text-muted-foreground">
-                    Aucun événement à venir
-                </p>
-                </>
-            )}
-          </CardContent>
-        </Card>
+        
+        {upcomingEvent ? (
+          <Link href={`/events/${upcomingEvent.id}/record-sales`}>
+            <UpcomingEventCard />
+          </Link>
+        ) : (
+          <UpcomingEventCard />
+        )}
       </div>
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-7">
         <Card className="lg:col-span-4">

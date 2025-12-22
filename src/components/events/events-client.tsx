@@ -1,26 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle, ShoppingCart } from 'lucide-react';
+import { MoreHorizontal, PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { addEvent, updateEvent, deleteEvent as deleteEventAction } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import Link from 'next/link';
 
 type EventsClientProps = {
   initialEvents: Event[];
 };
-
-type EditingEvent = Omit<Event, 'date'> & { date: Date } | null;
 
 export default function EventsClient({ initialEvents }: EventsClientProps) {
   const [events, setEvents] = useState<Event[]>(initialEvents);
@@ -28,6 +26,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
+  const router = useRouter();
 
   useEffect(() => {
     setIsClient(true);
@@ -78,6 +77,10 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
   
   const editingDateValue = editingEvent ? format(parseISO(editingEvent.date), "yyyy-MM-dd'T'HH:mm") : '';
 
+  const handleRowClick = (eventId: string) => {
+    router.push(`/events/${eventId}/record-sales`);
+  };
+
   return (
     <>
       <Card>
@@ -86,7 +89,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
             <div>
               <CardTitle>Gestion des Événements</CardTitle>
               <CardDescription>
-                Créez, modifiez, supprimez des événements et enregistrez les ventes.
+                Cliquez sur un événement pour enregistrer les ventes ou utilisez le menu pour d'autres actions.
               </CardDescription>
             </div>
             <Button onClick={() => handleOpenDialog(null)}>
@@ -107,7 +110,11 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
             </TableHeader>
             <TableBody>
               {events.map((event) => (
-                <TableRow key={event.id}>
+                <TableRow 
+                  key={event.id} 
+                  onClick={() => handleRowClick(event.id)}
+                  className="cursor-pointer"
+                >
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
                   <TableCell>{isClient ? format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr }) : ''}</TableCell>
@@ -115,18 +122,16 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button 
+                          variant="ghost" 
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => e.stopPropagation()} // Prevent row click
+                        >
                           <span className="sr-only">Ouvrir le menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                         <DropdownMenuItem asChild>
-                          <Link href={`/events/${event.id}/record-sales`}>
-                            <ShoppingCart className="mr-2 h-4 w-4" />
-                            Enregistrer les ventes
-                          </Link>
-                        </DropdownMenuItem>
+                      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenuItem onClick={() => handleOpenDialog(event)}>
                           Modifier
                         </DropdownMenuItem>
