@@ -1,6 +1,6 @@
 'use client';
 
-import type { Item, Sale, Event } from '@/lib/types';
+import type { Item, SaleWithISOString, EventWithISOString } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -30,17 +30,14 @@ import {
   Package,
   TriangleAlert,
   Calendar,
+  Loader2,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
-
-type DashboardClientProps = {
-  items: Item[];
-  sales: Sale[];
-  events: Event[];
-};
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 const chartConfig = {
   revenue: {
@@ -49,8 +46,21 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export default function DashboardClient({ items, sales, events }: DashboardClientProps) {
+export default function DashboardClient() {
+  const firestore = useFirestore();
+
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
+    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  );
+  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(
+    useMemoFirebase(() => collection(firestore, 'sales'), [firestore])
+  );
+  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(
+    useMemoFirebase(() => collection(firestore, 'events'), [firestore])
+  );
+
   const { totalRevenue, totalSales, lowStockItems } = useMemo(() => {
+    if (!items || !sales) return { totalRevenue: 0, totalSales: 0, lowStockItems: [] };
     const totalRevenue = sales.reduce((acc, sale) => acc + sale.salePrice, 0);
     const totalSales = sales.reduce((acc, sale) => acc + sale.quantity, 0);
     const lowStockItems = items.filter(
@@ -60,6 +70,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
   }, [items, sales]);
 
   const salesByDay = useMemo(() => {
+    if (!sales) return [];
     const data: { [key: string]: number } = {};
     sales.forEach((sale) => {
       const day = format(parseISO(sale.timestamp), 'eee', { locale: fr });
@@ -74,7 +85,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
       .reverse();
   }, [sales]);
 
-  const recentSales = sales.slice(0, 5);
+  const recentSales = useMemo(() => sales?.slice(0, 5) || [], [sales]);
 
   const mostRecentEvent = useMemo(() => {
     if (!events || events.length === 0) return undefined;
@@ -82,6 +93,12 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
     .map(e => ({...e, date: parseISO(e.date)}))
     .sort((a,b) => b.date.getTime() - a.date.getTime())[0];
   }, [events]);
+
+  const isLoading = itemsLoading || salesLoading || eventsLoading;
+  
+  if (isLoading) {
+      return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   const MostRecentEventCard = () => (
     <Card className={mostRecentEvent ? 'bg-accent/50 hover:bg-accent/70 transition-colors' : ''}>
@@ -148,7 +165,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{items.length}</div>
+            <div className="text-2xl font-bold">{items?.length || 0}</div>
             <p className="text-xs text-muted-foreground">
               Nombre d'articles uniques en stock
             </p>
@@ -212,7 +229,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
               </TableHeader>
               <TableBody>
                 {recentSales.map((sale) => {
-                  const item = items.find((i) => i.id === sale.itemId);
+                  const item = items?.find((i) => i.id === sale.itemId);
                   return (
                     <TableRow key={sale.id}>
                       <TableCell>
@@ -273,3 +290,5 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
     </div>
   );
 }
+
+    

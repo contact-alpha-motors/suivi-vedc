@@ -1,189 +1,228 @@
-import type { Item, Sale, Event, EventStock } from './types';
+'use client';
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  writeBatch,
+  serverTimestamp,
+  query,
+  where,
+  Timestamp,
+  documentId,
+  getFirestore
+} from 'firebase/firestore';
+import type { Item, Sale, Event, EventStock, SaleWithISOString, EventWithISOString } from './types';
+import { initializeFirebase } from '@/firebase';
 
-// Simulate a database
-let items: Item[] = [
-  { id: '1', name: 'Livre "VEDC"', description: 'Le livre principal de la collection.', price: 15.00, initialQuantity: 100, currentQuantity: 75, lowStockThreshold: 10 },
-  { id: '2', name: 'Calendrier 2024', description: 'Calendrier annuel avec illustrations.', price: 10.00, initialQuantity: 200, currentQuantity: 150, lowStockThreshold: 20 },
-  { id: '3', name: 'Affiche "Espoir"', description: 'Affiche décorative format A3.', price: 5.00, initialQuantity: 50, currentQuantity: 4, lowStockThreshold: 5 },
-  { id: '4', name: 'T-shirt Logo', description: 'T-shirt en coton bio avec le logo VEDC.', price: 25.00, initialQuantity: 75, currentQuantity: 60, lowStockThreshold: 10 },
-  { id: '5', name: 'Mug VEDC', description: 'Mug en céramique.', price: 12.00, initialQuantity: 40, currentQuantity: 40, lowStockThreshold: 5 },
-];
+const { firestore: db } = initializeFirebase();
 
-let sales: Omit<Sale, 'timestamp'> & { timestamp: Date }[] = [
-    { id: 's1', itemId: '1', quantity: 2, salePrice: 30.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)), eventId: 'e1' },
-    { id: 's2', itemId: '2', quantity: 5, salePrice: 50.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)), eventId: 'e1' },
-    { id: 's3', itemId: '1', quantity: 1, salePrice: 15.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 1)) },
-    { id: 's4', itemId: '3', quantity: 3, salePrice: 15.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 1)), eventId: 'e2' },
-    { id: 's5', itemId: '4', quantity: 1, salePrice: 25.00, timestamp: new Date() },
-    { id: 's6', itemId: '2', quantity: 10, salePrice: 100.00, timestamp: new Date(), eventId: 'e2' },
-];
+const itemsCollection = collection(db, 'inventoryItems');
+const salesCollection = collection(db, 'sales');
+const eventsCollection = collection(db, 'events');
+const eventStocksCollection = collection(db, 'eventStocks');
 
-let events: Omit<Event, 'date'> & { date: Date }[] = [
-    { id: 'e1', name: 'Vente Anuelle', location: 'Paris', date: new Date('2024-09-15T09:00:00'), administrator: 'Jean Dupont' },
-    { id: 'e2', name: 'Festival du Livre', location: 'Lyon', date: new Date('2024-10-20T10:00:00'), administrator: 'Marie Curie' },
-    { id: 'e3', name: 'Marché de Noël', location: 'Strasbourg', date: new Date('2024-12-05T09:00:00'), administrator: 'Pierre Martin' },
-];
-
-let eventStocks: EventStock[] = [
-    { eventId: 'e1', itemId: '1', allocatedQuantity: 20 },
-    { eventId: 'e1', itemId: '2', allocatedQuantity: 30 },
-    { eventId: 'e2', itemId: '1', allocatedQuantity: 10 },
-    { eventId: 'e2', itemId: '2', allocatedQuantity: 50 },
-    { eventId: 'e2', itemId: '3', allocatedQuantity: 10 },
-];
-
-const toJSON = <T extends { timestamp?: Date; date?: Date }>(obj: T) => {
-    const newObj = { ...obj };
-    if (newObj.timestamp) {
-        (newObj as any).timestamp = newObj.timestamp.toISOString();
+const fromFirestore = <T extends { timestamp?: Timestamp; date?: Timestamp }>(doc: any): T => {
+    const data = doc.data();
+    const result: any = { ...data, id: doc.id };
+    if (data.timestamp && data.timestamp instanceof Timestamp) {
+      result.timestamp = data.timestamp.toDate().toISOString();
     }
-    if (newObj.date) {
-        (newObj as any).date = newObj.date.toISOString();
+    if (data.date && data.date instanceof Timestamp) {
+      result.date = data.date.toDate().toISOString();
     }
-    return newObj;
+    return result as T;
 };
 
-// Simulate API calls
+// --- Item Functions ---
 export const getItems = async (): Promise<Item[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return items;
+  const snapshot = await getDocs(itemsCollection);
+  return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Item));
 };
 
 export const getItem = async (id: string): Promise<Item | undefined> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return items.find(item => item.id === id);
-}
-
-export const getSales = async (): Promise<Sale[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return sales.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).map(toJSON) as Sale[];
+  const docRef = doc(db, 'inventoryItems', id);
+  const docSnap = await getDoc(docRef);
+  return docSnap.exists() ? { ...docSnap.data(), id: docSnap.id } as Item : undefined;
 };
 
-export const getSalesForEvent = async(eventId: string): Promise<Sale[]> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return sales.filter(s => s.eventId === eventId).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).map(toJSON) as Sale[];
-}
+export const addItem = async (item: Omit<Item, 'id'>): Promise<Item> => {
+  const docRef = await addDoc(itemsCollection, item);
+  return { ...item, id: docRef.id };
+};
 
-export const getEvents = async (): Promise<Event[]> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return events.map(toJSON) as Event[];
-}
+export const updateItem = async (updatedItem: Item): Promise<Item> => {
+  const docRef = doc(db, 'inventoryItems', updatedItem.id);
+  await updateDoc(docRef, { ...updatedItem });
+  return updatedItem;
+};
 
-export const getEvent = async (id: string): Promise<Event | undefined> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    const event = events.find(event => event.id === id);
-    return event ? toJSON(event) as Event : undefined;
-}
+export const deleteItem = async (id: string): Promise<{ success: boolean }> => {
+  const docRef = doc(db, 'inventoryItems', id);
+  await deleteDoc(docRef);
+  return { success: true };
+};
 
+
+// --- Sale Functions ---
+export const getSales = async (): Promise<SaleWithISOString[]> => {
+  const snapshot = await getDocs(query(salesCollection));
+  return snapshot.docs.map(doc => fromFirestore<SaleWithISOString>(doc));
+};
+
+export const getSalesForEvent = async (eventId: string): Promise<SaleWithISOString[]> => {
+  const q = query(salesCollection, where('eventId', '==', eventId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => fromFirestore<SaleWithISOString>(doc));
+};
+
+type AddSalePayload = {
+  itemId: string;
+  quantity: number;
+  saleDate?: string;
+  eventId?: string;
+};
+
+export const addSale = async (sale: AddSalePayload): Promise<SaleWithISOString> => {
+  const item = await getItem(sale.itemId);
+  if (!item) throw new Error('Item not found');
+
+  const batch = writeBatch(db);
+
+  if (sale.eventId) {
+    const eventStockRef = doc(db, 'eventStocks', `${sale.eventId}_${sale.itemId}`);
+    const eventStockSnap = await getDoc(eventStockRef);
+    
+    const eventStockData = eventStockSnap.data() as EventStock | undefined;
+
+    const salesSnapshot = await getDocs(query(salesCollection, where('eventId', '==', sale.eventId), where('itemId', '==', sale.itemId)));
+    const salesForEventItem = salesSnapshot.docs.map(d => d.data() as Sale).reduce((sum, s) => sum + s.quantity, 0);
+
+    const eventStockAvailable = (eventStockData?.allocatedQuantity || 0) - salesForEventItem;
+
+    if (eventStockAvailable < sale.quantity) {
+      throw new Error(`Stock d'événement insuffisant pour ${item.name}. Restant: ${eventStockAvailable}`);
+    }
+    // No change to central stock when it's an event sale
+  } else {
+    if (item.currentQuantity < sale.quantity) {
+      throw new Error(`Stock central insuffisant pour ${item.name}`);
+    }
+    const itemRef = doc(db, 'inventoryItems', item.id);
+    batch.update(itemRef, { currentQuantity: item.currentQuantity - sale.quantity });
+  }
+
+  let saleTimestamp: Timestamp;
+  if (sale.saleDate) {
+      const date = new Date(sale.saleDate);
+      const now = new Date();
+      date.setHours(now.getHours());
+      date.setMinutes(now.getMinutes());
+      date.setSeconds(now.getSeconds());
+      saleTimestamp = Timestamp.fromDate(date);
+  } else {
+      saleTimestamp = Timestamp.now();
+  }
+
+  const newSaleData = {
+    itemId: sale.itemId,
+    quantity: sale.quantity,
+    salePrice: item.price * sale.quantity,
+    timestamp: saleTimestamp,
+    eventId: sale.eventId || null,
+  };
+
+  const saleDocRef = doc(collection(db, 'sales'));
+  batch.set(saleDocRef, newSaleData);
+
+  await batch.commit();
+
+  return { 
+    ...newSaleData, 
+    id: saleDocRef.id, 
+    timestamp: newSaleData.timestamp.toDate().toISOString() 
+  };
+};
+
+// --- Event Functions ---
+export const getEvents = async (): Promise<EventWithISOString[]> => {
+  const snapshot = await getDocs(eventsCollection);
+  return snapshot.docs.map(doc => fromFirestore<EventWithISOString>(doc));
+};
+
+export const getEvent = async (id: string): Promise<EventWithISOString | undefined> => {
+  const docRef = doc(db, 'events', id);
+  const docSnap = await getDoc(docRef);
+  return docSnap.exists() ? fromFirestore<EventWithISOString>(docSnap) : undefined;
+};
+
+export const addEvent = async (event: Omit<Event, 'id' | 'date'> & { date: Date }): Promise<EventWithISOString> => {
+  const newEventData = {
+    ...event,
+    date: Timestamp.fromDate(event.date),
+  };
+  const docRef = await addDoc(eventsCollection, newEventData);
+  return { ...event, id: docRef.id, date: event.date.toISOString() };
+};
+
+export const updateEvent = async (updatedEventData: Omit<Event, 'date'> & { date: Date }): Promise<EventWithISOString> => {
+  const docRef = doc(db, 'events', updatedEventData.id);
+  const dataToUpdate = {
+    ...updatedEventData,
+    date: Timestamp.fromDate(updatedEventData.date),
+  };
+  await updateDoc(docRef, dataToUpdate);
+  return { ...updatedEventData, date: updatedEventData.date.toISOString() };
+};
+
+export const deleteEvent = async (id: string): Promise<{ success: boolean }> => {
+  const docRef = doc(db, 'events', id);
+  await deleteDoc(docRef);
+  // Also delete associated event stocks
+  const q = query(eventStocksCollection, where('eventId', '==', id));
+  const snapshot = await getDocs(q);
+  const batch = writeBatch(db);
+  snapshot.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  return { success: true };
+};
+
+// --- EventStock Functions ---
 export const getEventStocks = async (eventId: string): Promise<EventStock[]> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return eventStocks.filter(es => es.eventId === eventId);
+  const q = query(eventStocksCollection, where('eventId', '==', eventId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as EventStock));
 };
 
 export const allocateStockToEvent = async (eventId: string, itemId: string, quantity: number): Promise<EventStock> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const item = items.find(i => i.id === itemId);
-    if (!item) throw new Error("Article non trouvé.");
-    if (item.currentQuantity < quantity) throw new Error("Stock central insuffisant.");
+  const item = await getItem(itemId);
+  if (!item) throw new Error("Article non trouvé.");
+  if (item.currentQuantity < quantity) throw new Error("Stock central insuffisant.");
 
-    item.currentQuantity -= quantity;
-    
-    let eventStock = eventStocks.find(es => es.eventId === eventId && es.itemId === itemId);
-    if (eventStock) {
-        eventStock.allocatedQuantity += quantity;
-    } else {
-        eventStock = { eventId, itemId, allocatedQuantity: quantity };
-        eventStocks.push(eventStock);
-    }
-    
-    // Simulate updating the central item stock
-    await updateItem(item);
+  const batch = writeBatch(db);
+  const itemRef = doc(db, 'inventoryItems', itemId);
+  batch.update(itemRef, { currentQuantity: item.currentQuantity - quantity });
+  
+  const eventStockId = `${eventId}_${itemId}`;
+  const eventStockRef = doc(db, 'eventStocks', eventStockId);
+  const eventStockSnap = await getDoc(eventStockRef);
 
-    return { ...eventStock };
-}
+  let finalEventStock: EventStock;
 
+  if (eventStockSnap.exists()) {
+    const currentStock = eventStockSnap.data() as EventStock;
+    const newQuantity = currentStock.allocatedQuantity + quantity;
+    batch.update(eventStockRef, { allocatedQuantity: newQuantity });
+    finalEventStock = { ...currentStock, allocatedQuantity: newQuantity };
+  } else {
+    const newStock: EventStock = { id: eventStockId, eventId, itemId, allocatedQuantity: quantity };
+    batch.set(eventStockRef, { eventId, itemId, allocatedQuantity: quantity });
+    finalEventStock = newStock;
+  }
 
-// These functions simulate mutations and would be replaced by API calls or offline storage logic
-export const addItem = async (item: Omit<Item, 'id'>): Promise<Item> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const newItem: Item = { ...item, id: String(Date.now()) };
-    items.push(newItem);
-    return newItem;
-}
-
-export const updateItem = async (updatedItem: Item): Promise<Item> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    items = items.map(item => item.id === updatedItem.id ? updatedItem : item);
-    return updatedItem;
-}
-
-export const deleteItem = async (id: string): Promise<{ success: boolean }> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    items = items.filter(item => item.id !== id);
-    return { success: true };
-}
-
-type AddSalePayload = {
-    itemId: string;
-    quantity: number;
-    saleDate?: string;
-    eventId?: string;
+  await batch.commit();
+  return finalEventStock;
 };
-
-export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
-    await new Promise(resolve => setTimeout(resolve, 100)); // Quicker for bulk
-    const item = await getItem(sale.itemId);
-    if (!item) throw new Error('Item not found');
-
-    if (sale.eventId) {
-        const eventStock = eventStocks.find(es => es.eventId === sale.eventId && es.itemId === sale.itemId);
-        const salesForEventItem = sales.filter(s => s.eventId === sale.eventId && s.itemId === sale.itemId).reduce((sum, s) => sum + s.quantity, 0);
-        const eventStockAvailable = (eventStock?.allocatedQuantity || 0) - salesForEventItem;
-        if (eventStockAvailable < sale.quantity) throw new Error(`Stock d'événement insuffisant pour ${item.name}. Restant: ${eventStockAvailable}`);
-    } else {
-        if (item.currentQuantity < sale.quantity) throw new Error(`Stock central insuffisant pour ${item.name}`);
-        item.currentQuantity -= sale.quantity; // Deduct from central stock only if no event
-        await updateItem(item);
-    }
-    
-    const timestamp = sale.saleDate ? new Date(sale.saleDate) : new Date();
-    // make sure timestamp also includes current time
-    if (sale.saleDate) {
-        timestamp.setHours(new Date().getHours());
-        timestamp.setMinutes(new Date().getMinutes());
-        timestamp.setSeconds(new Date().getSeconds());
-    }
-
-
-    const newSaleData = { 
-        itemId: sale.itemId,
-        quantity: sale.quantity,
-        id: `${Date.now()}-${Math.random()}`, 
-        timestamp: timestamp,
-        salePrice: item.price * sale.quantity,
-        eventId: sale.eventId,
-    };
-    
-    sales.unshift(newSaleData); // Add to beginning of array
-
-    return toJSON(newSaleData) as Sale;
-}
-
-export const addEvent = async (event: Omit<Event, 'id' | 'date'> & {date: Date}): Promise<Event> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    const newEventData = { ...event, id: String(Date.now()) };
-    events.push(newEventData);
-    return toJSON(newEventData) as Event;
-}
-
-export const updateEvent = async (updatedEventData: Omit<Event, 'date'> & {date: Date}): Promise<Event> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    events = events.map(event => event.id === updatedEventData.id ? updatedEventData : event);
-    return toJSON(updatedEventData) as Event;
-}
-
-export const deleteEvent = async (id: string): Promise<{ success: boolean }> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    events = events.filter(event => event.id !== id);
-    return { success: true };
-}

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   SidebarProvider,
@@ -21,6 +21,8 @@ import {
   Building,
 } from 'lucide-react';
 import Header from './header';
+import { useAuth } from '@/firebase';
+import { initiateAnonymousSignIn } from '@/firebase/non-blocking-login';
 
 const navItems = [
   { href: '/', label: 'Tableau de Bord', icon: LayoutDashboard },
@@ -31,6 +33,11 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const auth = useAuth();
+
+  useEffect(() => {
+    initiateAnonymousSignIn(auth);
+  }, [auth]);
 
   return (
     <SidebarProvider>

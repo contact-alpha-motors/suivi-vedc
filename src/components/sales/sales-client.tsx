@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import type { Item, Sale, Event } from '@/lib/types';
+import { useState, useMemo } from 'react';
+import type { Item, SaleWithISOString, EventWithISOString } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,19 +11,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { addSale } from '@/lib/data';
-import { Badge } from '../ui/badge';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 
-type SalesClientProps = {
-  initialItems: Item[];
-  initialSales: Sale[];
-  initialEvents: Event[];
-};
 
-export default function SalesClient({ initialItems, initialSales, initialEvents }: SalesClientProps) {
-  const [items, setItems] = useState<Item[]>(initialItems);
-  const [sales, setSales] = useState<Sale[]>(initialSales);
+export default function SalesClient() {
+  const firestore = useFirestore();
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
+    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  );
+  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(
+    useMemoFirebase(() => collection(firestore, 'sales'), [firestore])
+  );
+  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(
+    useMemoFirebase(() => collection(firestore, 'events'), [firestore])
+  );
+
   const { toast } = useToast();
 
   const handleRecordSale = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -31,7 +37,7 @@ export default function SalesClient({ initialItems, initialSales, initialEvents 
     const formData = new FormData(event.currentTarget);
     const itemId = formData.get('itemId') as string;
     const quantity = parseInt(formData.get('quantity') as string, 10);
-    const eventId = formData.get('eventId') as string || undefined;
+    const eventId = formData.get('eventId') as string === 'none' ? undefined : formData.get('eventId') as string;
 
     if (!itemId || !quantity || quantity <= 0) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez sélectionner un article et une quantité valide.' });
@@ -39,17 +45,7 @@ export default function SalesClient({ initialItems, initialSales, initialEvents 
     }
 
     try {
-      const newSale = await addSale({ itemId, quantity, eventId });
-      setSales(prev => [newSale, ...prev]);
-
-      // Update item quantity in local state only if it's not an event sale
-      if (!eventId) {
-        const itemSold = items.find(i => i.id === itemId);
-        if (itemSold) {
-          const updatedItem = { ...itemSold, currentQuantity: itemSold.currentQuantity - quantity };
-          setItems(prevItems => prevItems.map(i => i.id === itemId ? updatedItem : i));
-        }
-      }
+      await addSale({ itemId, quantity, eventId });
       
       toast({ title: 'Succès', description: 'Vente enregistrée.' });
       (event.target as HTMLFormElement).reset();
@@ -57,6 +53,17 @@ export default function SalesClient({ initialItems, initialSales, initialEvents 
       toast({ variant: 'destructive', title: 'Erreur', description: error.message || 'Impossible d\'enregistrer la vente.' });
     }
   };
+
+  const sortedSales = useMemo(() => {
+    if (!sales) return [];
+    return [...sales].sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime());
+  }, [sales]);
+
+  const isLoading = itemsLoading || salesLoading || eventsLoading;
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   return (
     <Tabs defaultValue="record">
@@ -82,7 +89,7 @@ export default function SalesClient({ initialItems, initialSales, initialEvents 
                   </SelectTrigger>
                   <SelectContent>
                      <SelectItem value="none">Aucun (Vente directe)</SelectItem>
-                    {initialEvents.map(event => (
+                    {events?.map(event => (
                       <SelectItem key={event.id} value={event.id}>
                         {event.name}
                       </SelectItem>
@@ -97,7 +104,7 @@ export default function SalesClient({ initialItems, initialSales, initialEvents 
                     <SelectValue placeholder="Sélectionnez un article" />
                   </SelectTrigger>
                   <SelectContent>
-                    {items.map(item => (
+                    {items?.map(item => (
                       <SelectItem key={item.id} value={item.id} disabled={item.currentQuantity === 0}>
                         {item.name} (Stock Central: {item.currentQuantity})
                       </SelectItem>
@@ -132,9 +139,9 @@ export default function SalesClient({ initialItems, initialSales, initialEvents 
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sales.map(sale => {
-                  const item = items.find(i => i.id === sale.itemId);
-                  const event = initialEvents.find(e => e.id === sale.eventId);
+                {sortedSales.map(sale => {
+                  const item = items?.find(i => i.id === sale.itemId);
+                  const event = events?.find(e => e.id === sale.eventId);
                   return (
                     <TableRow key={sale.id}>
                       <TableCell>{format(parseISO(sale.timestamp), 'Pp', { locale: fr })}</TableCell>

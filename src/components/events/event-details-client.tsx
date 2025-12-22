@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useMemo, use } from 'react';
-import type { Item, Sale, Event, EventStock } from '@/lib/types';
+import { useState, useMemo } from 'react';
+import type { Item, SaleWithISOString, EventWithISOString, EventStock } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,38 +12,42 @@ import { useToast } from '@/hooks/use-toast';
 import { addSale, allocateStockToEvent } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { ArrowLeft, Calendar, User, MapPin, PlusCircle, PackagePlus, MinusCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, User, MapPin, PlusCircle, PackagePlus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { collection, doc, query, where } from 'firebase/firestore';
 
 type EventDetailsClientProps = {
-  event: Event;
-  itemsPromise: Promise<Item[]>;
-  salesPromise: Promise<Sale[]>;
-  eventStocksPromise: Promise<EventStock[]>;
+  eventId: string;
 };
 
 type SalesInput = { [itemId: string]: number };
 type StockAllocationInput = { [itemId: string]: number };
 
-function EventDetailsClientContent({ 
-  event, 
-  initialItems, 
-  initialSales,
-  initialEventStocks
-}: { 
-  event: Event, 
-  initialItems: Item[], 
-  initialSales: Sale[],
-  initialEventStocks: EventStock[]
-}) {
-  const [items, setItems] = useState<Item[]>(initialItems);
-  const [sales, setSales] = useState<Sale[]>(initialSales);
-  const [eventStocks, setEventStocks] = useState<EventStock[]>(initialEventStocks);
+export default function EventDetailsClient({ eventId }: EventDetailsClientProps) {
+  const firestore = useFirestore();
+  
+  const { data: event, isLoading: eventLoading } = useDoc<EventWithISOString>(
+    useMemoFirebase(() => doc(firestore, 'events', eventId), [firestore, eventId])
+  );
+
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
+    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  );
+
+  const salesQuery = useMemoFirebase(() => query(collection(firestore, 'sales'), where('eventId', '==', eventId)), [firestore, eventId]);
+  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
+  
+  const eventStocksQuery = useMemoFirebase(() => query(collection(firestore, 'eventStocks'), where('eventId', '==', eventId)), [firestore, eventId]);
+  const { data: eventStocks, isLoading: eventStocksLoading } = useCollection<EventStock>(eventStocksQuery);
 
   const [salesInput, setSalesInput] = useState<SalesInput>({});
   const [saleDate, setSaleDate] = useState(format(new Date(), "yyyy-MM-dd"));
   
   const [stockAllocationInput, setStockAllocationInput] = useState<StockAllocationInput>({});
+  
+  const [isSubmittingSale, setIsSubmittingSale] = useState(false);
+  const [isSubmittingStock, setIsSubmittingStock] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -58,6 +62,7 @@ function EventDetailsClientContent({
   };
 
   const handleBulkRecordSales = async () => {
+    if (!event) return;
     const salesToRecord = Object.entries(salesInput)
       .filter(([, quantity]) => quantity > 0)
       .map(([itemId, quantity]) => ({ itemId, quantity, saleDate, eventId: event.id }));
@@ -67,15 +72,17 @@ function EventDetailsClientContent({
       return;
     }
     
+    setIsSubmittingSale(true);
     try {
       const promises = salesToRecord.map(sale => addSale(sale));
-      const results = await Promise.all(promises);
+      await Promise.all(promises);
 
-      setSales(prev => [...results, ...prev].sort((a,b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime()));
       setSalesInput({});
-      toast({ title: 'Succès', description: `${results.length} vente(s) enregistrée(s) pour le ${format(new Date(saleDate), 'dd/MM/yyyy')}.` });
+      toast({ title: 'Succès', description: `${salesToRecord.length} vente(s) enregistrée(s) pour le ${format(parseISO(saleDate), 'dd/MM/yyyy')}.` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: error.message || 'Impossible d\'enregistrer les ventes.' });
+    } finally {
+      setIsSubmittingSale(false);
     }
   };
   
@@ -85,34 +92,27 @@ function EventDetailsClientContent({
       toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez entrer une quantité valide.'});
       return;
     }
+    if (!event) return;
 
+    setIsSubmittingStock(itemId);
     try {
-      const updatedEventStock = await allocateStockToEvent(event.id, itemId, quantity);
-
-      // Update central stock item
-      const centralItem = items.find(i => i.id === itemId)!;
-      const updatedCentralItem = {...centralItem, currentQuantity: centralItem.currentQuantity - quantity };
-      setItems(prev => prev.map(i => i.id === itemId ? updatedCentralItem : i));
-      
-      // Update event stock list
-      const existingEventStock = eventStocks.find(es => es.itemId === itemId);
-      if (existingEventStock) {
-        setEventStocks(prev => prev.map(es => es.itemId === itemId ? updatedEventStock : es));
-      } else {
-        setEventStocks(prev => [...prev, updatedEventStock]);
-      }
+      await allocateStockToEvent(event.id, itemId, quantity);
+      const centralItem = items?.find(i => i.id === itemId)!;
       
       setStockAllocationInput(prev => ({...prev, [itemId]: 0}));
       toast({ title: 'Succès', description: `${quantity} unité(s) de "${centralItem.name}" allouée(s) à l'événement.`});
 
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: error.message || "Impossible d'allouer le stock."});
+    } finally {
+      setIsSubmittingStock(null);
     }
   };
 
 
   const salesByDay = useMemo(() => {
-    const grouped: { [key: string]: Sale[] } = {};
+    if (!sales) return [];
+    const grouped: { [key: string]: SaleWithISOString[] } = {};
     sales.forEach(sale => {
       const day = format(parseISO(sale.timestamp), 'yyyy-MM-dd');
       if (!grouped[day]) grouped[day] = [];
@@ -122,14 +122,25 @@ function EventDetailsClientContent({
   }, [sales]);
 
   const eventItemsWithStock = useMemo(() => {
+    if (!items) return [];
     return items.map(item => {
-      const eventStock = eventStocks.find(es => es.itemId === item.id);
+      const eventStock = eventStocks?.find(es => es.itemId === item.id);
       const allocatedQuantity = eventStock ? eventStock.allocatedQuantity : 0;
-      const soldQuantity = sales.filter(s => s.itemId === item.id).reduce((sum, s) => sum + s.quantity, 0);
+      const soldQuantity = sales?.filter(s => s.itemId === item.id).reduce((sum, s) => sum + s.quantity, 0) || 0;
       const remainingQuantity = allocatedQuantity - soldQuantity;
       return { ...item, allocatedQuantity, soldQuantity, remainingQuantity };
     });
   }, [items, sales, eventStocks]);
+  
+  const isLoading = eventLoading || itemsLoading || salesLoading || eventStocksLoading;
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
+  
+  if (!event) {
+    return <div>Événement non trouvé.</div>;
+  }
 
   return (
     <div className="grid gap-6">
@@ -183,14 +194,15 @@ function EventDetailsClientContent({
                             <TableCell className="font-medium">{item.name}</TableCell>
                             <TableCell>{item.remainingQuantity}</TableCell>
                             <TableCell>
-                                <Input type="number" min="0" max={item.remainingQuantity} placeholder="0" value={salesInput[item.id] || ''} onChange={(e) => handleQuantityChange(item.id, e.target.value)} disabled={item.remainingQuantity === 0} />
+                                <Input type="number" min="0" max={item.remainingQuantity} placeholder="0" value={salesInput[item.id] || ''} onChange={(e) => handleQuantityChange(item.id, e.target.value)} disabled={item.remainingQuantity === 0 || isSubmittingSale} />
                             </TableCell>
                             </TableRow>
                         ))}
                         </TableBody>
                     </Table>
-                    <Button onClick={handleBulkRecordSales} className="w-full">
-                        <PlusCircle className="mr-2 h-4 w-4" /> Enregistrer les ventes du jour
+                    <Button onClick={handleBulkRecordSales} className="w-full" disabled={isSubmittingSale}>
+                        {isSubmittingSale ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+                        {isSubmittingSale ? 'Enregistrement...' : 'Enregistrer les ventes du jour'}
                     </Button>
                     </div>
                 </CardContent>
@@ -214,16 +226,18 @@ function EventDetailsClientContent({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map(item => (
+                    {items?.map(item => (
                       <TableRow key={item.id}>
                         <TableCell className="font-medium">{item.name}</TableCell>
                         <TableCell>{item.currentQuantity}</TableCell>
-                        <TableCell>{eventStocks.find(es => es.itemId === item.id)?.allocatedQuantity || 0}</TableCell>
+                        <TableCell>{eventStocks?.find(es => es.itemId === item.id)?.allocatedQuantity || 0}</TableCell>
                         <TableCell>
-                          <Input type="number" min="0" max={item.currentQuantity} placeholder="0" value={stockAllocationInput[item.id] || ''} onChange={(e) => handleStockAllocationChange(item.id, e.target.value)} disabled={item.currentQuantity === 0} />
+                          <Input type="number" min="0" max={item.currentQuantity} placeholder="0" value={stockAllocationInput[item.id] || ''} onChange={(e) => handleStockAllocationChange(item.id, e.target.value)} disabled={item.currentQuantity === 0 || !!isSubmittingStock} />
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button size="sm" onClick={() => handleAllocateStock(item.id)} disabled={(stockAllocationInput[item.id] || 0) <= 0}><PackagePlus className="h-4 w-4" /></Button>
+                          <Button size="sm" onClick={() => handleAllocateStock(item.id)} disabled={(stockAllocationInput[item.id] || 0) <= 0 || !!isSubmittingStock}>
+                            {isSubmittingStock === item.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <PackagePlus className="h-4 w-4" />}
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -255,7 +269,7 @@ function EventDetailsClientContent({
                                     </TableHeader>
                                     <TableBody>
                                         {daySales.map(sale => {
-                                            const item = items.find(i => i.id === sale.itemId);
+                                            const item = items?.find(i => i.id === sale.itemId);
                                             return (
                                                 <TableRow key={sale.id}>
                                                     <TableCell>{format(parseISO(sale.timestamp), 'HH:mm', { locale: fr })}</TableCell>
@@ -279,12 +293,4 @@ function EventDetailsClientContent({
       </Tabs>
     </div>
   );
-}
-
-export default function EventDetailsClient(props: EventDetailsClientProps) {
-    const initialItems = use(props.itemsPromise);
-    const initialSales = use(props.salesPromise);
-    const initialEventStocks = use(props.eventStocksPromise);
-
-    return <EventDetailsClientContent {...props} initialItems={initialItems} initialSales={initialSales} initialEventStocks={initialEventStocks} />
 }

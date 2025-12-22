@@ -1,3 +1,5 @@
+import { Timestamp } from 'firebase/firestore';
+
 export interface Item {
   id: string;
   name: string;
@@ -9,6 +11,7 @@ export interface Item {
 }
 
 export interface EventStock {
+  id: string; // Composite key `${eventId}_${itemId}` in Firestore
   eventId: string;
   itemId: string;
   allocatedQuantity: number;
@@ -19,7 +22,7 @@ export interface Sale {
   itemId: string;
   quantity: number;
   salePrice: number; // price at time of sale * quantity
-  timestamp: string; // ISO 8601 string
+  timestamp: Timestamp;
   eventId?: string;
 }
 
@@ -27,6 +30,14 @@ export interface Event {
   id: string;
   name: string;
   location: string;
-  date: string; // ISO 8601 string
+  date: Timestamp;
   administrator: string;
+}
+
+// For UI state, we often need the string version
+export interface SaleWithISOString extends Omit<Sale, 'timestamp'> {
+  timestamp: string;
+}
+export interface EventWithISOString extends Omit<Event, 'date'> {
+  date: string;
 }

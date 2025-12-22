@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { Item } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import {
@@ -33,7 +33,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import {
   addItem,
@@ -43,13 +43,16 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
-type InventoryClientProps = {
-  initialItems: Item[];
-};
 
-export default function InventoryClient({ initialItems }: InventoryClientProps) {
-  const [items, setItems] = useState<Item[]>(initialItems);
+export default function InventoryClient() {
+  const firestore = useFirestore();
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
+    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  );
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const { toast } = useToast();
@@ -62,7 +65,6 @@ export default function InventoryClient({ initialItems }: InventoryClientProps) 
   const handleDelete = async (id: string) => {
     try {
       await deleteItemAction(id);
-      setItems((prev) => prev.filter((item) => item.id !== id));
       toast({
         title: 'Succès',
         description: "L'article a été supprimé.",
@@ -92,14 +94,10 @@ export default function InventoryClient({ initialItems }: InventoryClientProps) 
 
     try {
       if (editingItem) {
-        const updated = await updateItem({ ...itemData, id: editingItem.id });
-        setItems((prev) =>
-          prev.map((i) => (i.id === updated.id ? updated : i))
-        );
+        await updateItem({ ...itemData, id: editingItem.id });
         toast({ title: 'Succès', description: 'Article mis à jour.' });
       } else {
-        const new_item = await addItem(itemData);
-        setItems((prev) => [...prev, new_item]);
+        await addItem(itemData);
         toast({ title: 'Succès', description: 'Article ajouté.' });
       }
       setIsDialogOpen(false);
@@ -111,6 +109,10 @@ export default function InventoryClient({ initialItems }: InventoryClientProps) 
       });
     }
   };
+  
+  if (itemsLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   return (
     <>
@@ -140,7 +142,7 @@ export default function InventoryClient({ initialItems }: InventoryClientProps) 
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((item) => (
+              {items?.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="text-muted-foreground max-w-sm truncate">{item.description}</TableCell>

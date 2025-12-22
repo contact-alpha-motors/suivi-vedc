@@ -1,29 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { Event } from '@/lib/types';
+import type { EventWithISOString } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { addEvent, updateEvent, deleteEvent as deleteEventAction } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
-type EventsClientProps = {
-  initialEvents: Event[];
-};
+export default function EventsClient() {
+  const firestore = useFirestore();
+  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(
+    useMemoFirebase(() => collection(firestore, 'events'), [firestore])
+  );
 
-export default function EventsClient({ initialEvents }: EventsClientProps) {
-  const [events, setEvents] = useState<Event[]>(initialEvents);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventWithISOString | null>(null);
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
   const router = useRouter();
@@ -32,7 +34,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
     setIsClient(true);
   }, []);
 
-  const handleOpenDialog = (event: Event | null) => {
+  const handleOpenDialog = (event: EventWithISOString | null) => {
     setEditingEvent(event);
     setIsDialogOpen(true);
   };
@@ -40,7 +42,6 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
   const handleDelete = async (id: string) => {
     try {
       await deleteEventAction(id);
-      setEvents((prev) => prev.filter((event) => event.id !== id));
       toast({ title: 'Succès', description: "L'événement a été supprimé." });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de supprimer l'événement." });
@@ -61,15 +62,14 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
 
     try {
       if (editingEvent) {
-        const updated = await updateEvent({ ...eventData, id: editingEvent.id });
-        setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+        await updateEvent({ ...eventData, id: editingEvent.id });
         toast({ title: 'Succès', description: 'Événement mis à jour.' });
       } else {
-        const newEvent = await addEvent(eventData);
-        setEvents((prev) => [...prev, newEvent]);
+        await addEvent(eventData);
         toast({ title: 'Succès', description: 'Événement ajouté.' });
       }
       setIsDialogOpen(false);
+      setEditingEvent(null);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder l'événement." });
     }
@@ -80,6 +80,15 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
   const handleRowClick = (eventId: string) => {
     router.push(`/events/${eventId}`);
   };
+  
+  const sortedEvents = useMemo(() => {
+    if (!events) return [];
+    return [...events].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+  }, [events]);
+
+  if (eventsLoading) {
+    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  }
 
   return (
     <>
@@ -109,7 +118,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {events.map((event) => (
+              {sortedEvents.map((event) => (
                 <TableRow 
                   key={event.id} 
                   onClick={() => handleRowClick(event.id)}
@@ -182,7 +191,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
             </div>
             <DialogFooter>
               <DialogClose asChild>
-                <Button type="button" variant="secondary">Annuler</Button>
+                <Button type="button" variant="secondary" onClick={() => setEditingEvent(null)}>Annuler</Button>
               </DialogClose>
               <Button type="submit">Sauvegarder</Button>
             </DialogFooter>
