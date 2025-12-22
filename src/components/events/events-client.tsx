@@ -7,13 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, ShoppingCart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { addEvent, updateEvent, deleteEvent as deleteEventAction } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import Link from 'next/link';
 
 type EventsClientProps = {
   initialEvents: Event[];
@@ -75,8 +76,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
     }
   };
   
-  const editingDate = editingEvent ? parseISO(editingEvent.date) : null;
-  const editingDateValue = editingDate ? format(editingDate, "yyyy-MM-dd'T'HH:mm") : '';
+  const editingDateValue = editingEvent ? format(parseISO(editingEvent.date), "yyyy-MM-dd'T'HH:mm") : '';
 
   return (
     <>
@@ -86,7 +86,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
             <div>
               <CardTitle>Gestion des Événements</CardTitle>
               <CardDescription>
-                Créez, modifiez ou supprimez des événements.
+                Créez, modifiez, supprimez des événements et enregistrez les ventes.
               </CardDescription>
             </div>
             <Button onClick={() => handleOpenDialog(null)}>
@@ -121,6 +121,12 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                         <DropdownMenuItem asChild>
+                          <Link href={`/events/${event.id}/record-sales`}>
+                            <ShoppingCart className="mr-2 h-4 w-4" />
+                            Enregistrer les ventes
+                          </Link>
+                        </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleOpenDialog(event)}>
                           Modifier
                         </DropdownMenuItem>

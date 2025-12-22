@@ -26,6 +26,13 @@ export default function Header() {
   const pathname = usePathname();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar');
 
+  const getTitle = () => {
+    if (pathname.startsWith('/events/') && pathname.endsWith('/record-sales')) {
+      return "Saisie des Ventes par Événement";
+    }
+    return pageTitles[pathname] || 'Suivi d\'Inventaire VEDC';
+  }
+
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6">
       <div className="md:hidden">
@@ -33,7 +40,7 @@ export default function Header() {
       </div>
 
       <h1 className="text-lg font-semibold md:text-xl">
-        {pageTitles[pathname] || 'Suivi d\'Inventaire VEDC'}
+        {getTitle()}
       </h1>
 
       <div className="ml-auto">

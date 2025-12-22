@@ -56,6 +56,13 @@ export const getEvents = async (): Promise<Event[]> => {
     return events.map(toJSON) as Event[];
 }
 
+export const getEvent = async (id: string): Promise<Event | undefined> => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const event = events.find(event => event.id === id);
+    return event ? toJSON(event) as Event : undefined;
+}
+
+
 // These functions simulate mutations and would be replaced by API calls or offline storage logic
 export const addItem = async (item: Omit<Item, 'id'>): Promise<Item> => {
     await new Promise(resolve => setTimeout(resolve, 300));
@@ -76,17 +83,26 @@ export const deleteItem = async (id: string): Promise<{ success: boolean }> => {
     return { success: true };
 }
 
-export const addSale = async (sale: Omit<Sale, 'id' | 'timestamp' | 'salePrice'>): Promise<Sale> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
+type AddSalePayload = {
+    itemId: string;
+    quantity: number;
+    saleDate?: string;
+};
+
+export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
+    await new Promise(resolve => setTimeout(resolve, 100)); // Quicker for bulk
     const item = await getItem(sale.itemId);
     if (!item) throw new Error('Item not found');
 
-    if (item.currentQuantity < sale.quantity) throw new Error('Not enough stock');
+    if (item.currentQuantity < sale.quantity) throw new Error(`Stock insuffisant pour ${item.name}`);
     
+    const timestamp = sale.saleDate ? new Date(sale.saleDate) : new Date();
+
     const newSaleData = { 
-        ...sale, 
-        id: String(Date.now()), 
-        timestamp: new Date(),
+        itemId: sale.itemId,
+        quantity: sale.quantity,
+        id: `${Date.now()}-${Math.random()}`, 
+        timestamp: timestamp,
         salePrice: item.price * sale.quantity,
     };
     
