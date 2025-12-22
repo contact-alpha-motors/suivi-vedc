@@ -31,12 +31,7 @@ export default function EventsClient() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithISOString | null>(null);
   const { toast } = useToast();
-  const [isClient, setIsClient] = useState(false);
   const router = useRouter();
-
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
 
   const handleOpenDialog = (event: EventWithISOString | null) => {
     setEditingEvent(event);
@@ -79,7 +74,7 @@ export default function EventsClient() {
     }
   };
   
-  const editingDateValue = editingEvent ? format(parseISO(editingEvent.date), "yyyy-MM-dd'T'HH:mm") : '';
+  const editingDateValue = editingEvent ? format(parseISO(editingEvent.date), "yyyy-MM-dd") : '';
 
   const handleRowClick = (eventId: string) => {
     router.push(`/events/${eventId}`);
@@ -132,7 +127,7 @@ export default function EventsClient() {
                 >
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>{isClient ? format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr }) : ''}</TableCell>
+                  <TableCell>{format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr })}</TableCell>
                   <TableCell>{event.administrator}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -188,7 +183,7 @@ export default function EventsClient() {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="date" className="text-right">Date</Label>
-                <Input id="date" name="date" type="datetime-local" defaultValue={editingDateValue} className="col-span-3" required />
+                <Input id="date" name="date" type="date" defaultValue={editingDateValue} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="administrator" className="text-right">Admin</Label>
