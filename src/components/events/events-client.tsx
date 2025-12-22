@@ -12,10 +12,14 @@ import { useToast } from '@/hooks/use-toast';
 import { addEvent, updateEvent, deleteEvent as deleteEventAction } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 type EventsClientProps = {
   initialEvents: Event[];
 };
+
+type EditingEvent = Omit<Event, 'date'> & { date: Date } | null;
 
 export default function EventsClient({ initialEvents }: EventsClientProps) {
   const [events, setEvents] = useState<Event[]>(initialEvents);
@@ -65,6 +69,9 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder l'événement." });
     }
   };
+  
+  const editingDate = editingEvent ? parseISO(editingEvent.date) : null;
+  const editingDateValue = editingDate ? format(editingDate, "yyyy-MM-dd'T'HH:mm") : '';
 
   return (
     <>
@@ -98,7 +105,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                 <TableRow key={event.id}>
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>{new Date(event.date).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}</TableCell>
+                  <TableCell>{format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr })}</TableCell>
                   <TableCell>{event.administrator}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -150,7 +157,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="date" className="text-right">Date</Label>
-                <Input id="date" name="date" type="datetime-local" defaultValue={editingEvent ? new Date(editingEvent.date).toISOString().substring(0, 16) : ''} className="col-span-3" required />
+                <Input id="date" name="date" type="datetime-local" defaultValue={editingDateValue} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="administrator" className="text-right">Admin</Label>

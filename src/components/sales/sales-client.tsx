@@ -12,6 +12,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { addSale } from '@/lib/data';
 import { Badge } from '../ui/badge';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 type SalesClientProps = {
   initialItems: Item[];
@@ -117,7 +119,7 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
                   const remainingStock = item ? item.currentQuantity : 'N/A';
                   return (
                     <TableRow key={sale.id}>
-                      <TableCell>{new Date(sale.timestamp).toLocaleString('fr-FR')}</TableCell>
+                      <TableCell>{format(parseISO(sale.timestamp), 'Pp', { locale: fr })}</TableCell>
                       <TableCell className="font-medium">{item?.name || 'N/A'}</TableCell>
                       <TableCell className="text-right">{sale.quantity}</TableCell>
                       <TableCell className="text-right">{sale.salePrice.toLocaleString('fr-CM', { style: 'currency', currency: 'XAF' })}</TableCell>

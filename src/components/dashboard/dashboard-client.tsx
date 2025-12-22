@@ -32,6 +32,8 @@ import {
   Calendar,
 } from 'lucide-react';
 import { useMemo } from 'react';
+import { format, parseISO } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 type DashboardClientProps = {
   items: Item[];
@@ -59,9 +61,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
   const salesByDay = useMemo(() => {
     const data: { [key: string]: number } = {};
     sales.forEach((sale) => {
-      const day = new Date(sale.timestamp).toLocaleDateString('fr-FR', {
-        weekday: 'short',
-      });
+      const day = format(parseISO(sale.timestamp), 'eee', { locale: fr });
       if (!data[day]) {
         data[day] = 0;
       }
@@ -75,9 +75,12 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
 
   const recentSales = sales.slice(0, 5);
 
-  const upcomingEvent = events
+  const upcomingEvent = useMemo(() => {
+    return events
+    .map(e => ({...e, date: parseISO(e.date)}))
     .filter(e => e.date > new Date())
     .sort((a,b) => a.date.getTime() - b.date.getTime())[0];
+  }, [events]);
 
   return (
     <div className="grid gap-6">
@@ -133,7 +136,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
                 <>
                 <div className="text-lg font-bold">{upcomingEvent.name}</div>
                 <p className="text-xs text-muted-foreground">
-                    {upcomingEvent.date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric'})} à {upcomingEvent.location}
+                    {format(upcomingEvent.date, 'dd MMMM yyyy', { locale: fr })} à {upcomingEvent.location}
                 </p>
                 </>
             ) : (
@@ -202,7 +205,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
                       <TableCell>
                         <div className="font-medium">{item?.name || 'N/A'}</div>
                         <div className="text-sm text-muted-foreground">
-                          {sale.timestamp.toLocaleString('fr-FR')}
+                          {format(parseISO(sale.timestamp), 'Pp', { locale: fr })}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

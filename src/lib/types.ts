@@ -13,13 +13,13 @@ export interface Sale {
   itemId: string;
   quantity: number;
   salePrice: number; // price at time of sale * quantity
-  timestamp: Date;
+  timestamp: string; // ISO 8601 string
 }
 
 export interface Event {
   id: string;
   name: string;
   location: string;
-  date: Date;
+  date: string; // ISO 8601 string
   administrator: string;
 }

@@ -9,7 +9,7 @@ let items: Item[] = [
   { id: '5', name: 'Mug VEDC', description: 'Mug en céramique.', price: 12.00, initialQuantity: 40, currentQuantity: 40, lowStockThreshold: 5 },
 ];
 
-let sales: Sale[] = [
+let sales: Omit<Sale, 'timestamp'> & { timestamp: Date }[] = [
     { id: 's1', itemId: '1', quantity: 2, salePrice: 30.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)) },
     { id: 's2', itemId: '2', quantity: 5, salePrice: 50.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)) },
     { id: 's3', itemId: '1', quantity: 1, salePrice: 15.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 1)) },
@@ -18,11 +18,22 @@ let sales: Sale[] = [
     { id: 's6', itemId: '2', quantity: 10, salePrice: 100.00, timestamp: new Date() },
 ];
 
-let events: Event[] = [
+let events: Omit<Event, 'date'> & { date: Date }[] = [
     { id: 'e1', name: 'Vente Anuelle', location: 'Paris', date: new Date('2024-09-15T09:00:00'), administrator: 'Jean Dupont' },
     { id: 'e2', name: 'Festival du Livre', location: 'Lyon', date: new Date('2024-10-20T10:00:00'), administrator: 'Marie Curie' },
     { id: 'e3', name: 'Marché de Noël', location: 'Strasbourg', date: new Date('2024-12-05T09:00:00'), administrator: 'Pierre Martin' },
 ];
+
+const toJSON = <T extends { timestamp?: Date; date?: Date }>(obj: T) => {
+    const newObj = { ...obj };
+    if (newObj.timestamp) {
+        (newObj as any).timestamp = newObj.timestamp.toISOString();
+    }
+    if (newObj.date) {
+        (newObj as any).date = newObj.date.toISOString();
+    }
+    return newObj;
+};
 
 // Simulate API calls
 export const getItems = async (): Promise<Item[]> => {
@@ -37,12 +48,12 @@ export const getItem = async (id: string): Promise<Item | undefined> => {
 
 export const getSales = async (): Promise<Sale[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
-  return sales.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  return sales.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).map(toJSON) as Sale[];
 };
 
 export const getEvents = async (): Promise<Event[]> => {
     await new Promise(resolve => setTimeout(resolve, 500));
-    return events;
+    return events.map(toJSON) as Event[];
 }
 
 // These functions simulate mutations and would be replaced by API calls or offline storage logic
@@ -72,31 +83,31 @@ export const addSale = async (sale: Omit<Sale, 'id' | 'timestamp' | 'salePrice'>
 
     if (item.currentQuantity < sale.quantity) throw new Error('Not enough stock');
     
-    const newSale: Sale = { 
+    const newSaleData = { 
         ...sale, 
         id: String(Date.now()), 
         timestamp: new Date(),
         salePrice: item.price * sale.quantity,
     };
     
-    sales.unshift(newSale); // Add to beginning of array
+    sales.unshift(newSaleData); // Add to beginning of array
     item.currentQuantity -= sale.quantity;
     await updateItem(item);
 
-    return newSale;
+    return toJSON(newSaleData) as Sale;
 }
 
-export const addEvent = async (event: Omit<Event, 'id'>): Promise<Event> => {
+export const addEvent = async (event: Omit<Event, 'id' | 'date'> & {date: Date}): Promise<Event> => {
     await new Promise(resolve => setTimeout(resolve, 300));
-    const newEvent: Event = { ...event, id: String(Date.now()) };
-    events.push(newEvent);
-    return newEvent;
+    const newEventData = { ...event, id: String(Date.now()) };
+    events.push(newEventData);
+    return toJSON(newEventData) as Event;
 }
 
-export const updateEvent = async (updatedEvent: Event): Promise<Event> => {
+export const updateEvent = async (updatedEventData: Omit<Event, 'date'> & {date: Date}): Promise<Event> => {
     await new Promise(resolve => setTimeout(resolve, 300));
-    events = events.map(event => event.id === updatedEvent.id ? updatedEvent : event);
-    return updatedEvent;
+    events = events.map(event => event.id === updatedEventData.id ? updatedEventData : event);
+    return toJSON(updatedEventData) as Event;
 }
 
 export const deleteEvent = async (id: string): Promise<{ success: boolean }> => {
