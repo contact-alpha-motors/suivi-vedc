@@ -4,8 +4,14 @@ export interface Item {
   description: string;
   price: number;
   initialQuantity: number;
-  currentQuantity: number;
+  currentQuantity: number; // This is now central stock
   lowStockThreshold: number;
+}
+
+export interface EventStock {
+  eventId: string;
+  itemId: string;
+  allocatedQuantity: number;
 }
 
 export interface Sale {

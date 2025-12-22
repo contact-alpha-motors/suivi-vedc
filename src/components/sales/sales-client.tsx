@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { Item, Sale } from '@/lib/types';
+import type { Item, Sale, Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,9 +18,10 @@ import { fr } from 'date-fns/locale';
 type SalesClientProps = {
   initialItems: Item[];
   initialSales: Sale[];
+  initialEvents: Event[];
 };
 
-export default function SalesClient({ initialItems, initialSales }: SalesClientProps) {
+export default function SalesClient({ initialItems, initialSales, initialEvents }: SalesClientProps) {
   const [items, setItems] = useState<Item[]>(initialItems);
   const [sales, setSales] = useState<Sale[]>(initialSales);
   const { toast } = useToast();
@@ -30,6 +31,7 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
     const formData = new FormData(event.currentTarget);
     const itemId = formData.get('itemId') as string;
     const quantity = parseInt(formData.get('quantity') as string, 10);
+    const eventId = formData.get('eventId') as string || undefined;
 
     if (!itemId || !quantity || quantity <= 0) {
       toast({ variant: 'destructive', title: 'Erreur', description: 'Veuillez sélectionner un article et une quantité valide.' });
@@ -37,14 +39,16 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
     }
 
     try {
-      const newSale = await addSale({ itemId, quantity });
+      const newSale = await addSale({ itemId, quantity, eventId });
       setSales(prev => [newSale, ...prev]);
 
-      // Update item quantity in local state
-      const itemSold = items.find(i => i.id === itemId);
-      if (itemSold) {
-        const updatedItem = { ...itemSold, currentQuantity: itemSold.currentQuantity - quantity };
-        setItems(prevItems => prevItems.map(i => i.id === itemId ? updatedItem : i));
+      // Update item quantity in local state only if it's not an event sale
+      if (!eventId) {
+        const itemSold = items.find(i => i.id === itemId);
+        if (itemSold) {
+          const updatedItem = { ...itemSold, currentQuantity: itemSold.currentQuantity - quantity };
+          setItems(prevItems => prevItems.map(i => i.id === itemId ? updatedItem : i));
+        }
       }
       
       toast({ title: 'Succès', description: 'Vente enregistrée.' });
@@ -66,10 +70,26 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
         <Card>
           <CardHeader>
             <CardTitle>Nouvelle Vente</CardTitle>
-            <CardDescription>Sélectionnez un article et la quantité vendue.</CardDescription>
+            <CardDescription>Sélectionnez un article, la quantité vendue et éventuellement l'événement associé.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleRecordSale} className="grid gap-6">
+              <div className="grid gap-3">
+                <Label htmlFor="eventId">Événement (Optionnel)</Label>
+                <Select name="eventId">
+                  <SelectTrigger>
+                    <SelectValue placeholder="Vente hors-événement" />
+                  </SelectTrigger>
+                  <SelectContent>
+                     <SelectItem value="none">Aucun (Vente directe)</SelectItem>
+                    {initialEvents.map(event => (
+                      <SelectItem key={event.id} value={event.id}>
+                        {event.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="grid gap-3">
                 <Label htmlFor="itemId">Article</Label>
                 <Select name="itemId" required>
@@ -79,7 +99,7 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
                   <SelectContent>
                     {items.map(item => (
                       <SelectItem key={item.id} value={item.id} disabled={item.currentQuantity === 0}>
-                        {item.name} (Stock: {item.currentQuantity})
+                        {item.name} (Stock Central: {item.currentQuantity})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -106,26 +126,22 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
                 <TableRow>
                   <TableHead>Date & Heure</TableHead>
                   <TableHead>Article</TableHead>
+                  <TableHead>Événement</TableHead>
                   <TableHead className="text-right">Quantité</TableHead>
                   <TableHead className="text-right">Montant</TableHead>
-                  <TableHead className="text-right">Stock Restant</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sales.map(sale => {
                   const item = items.find(i => i.id === sale.itemId);
-                  // To show remaining stock at the time of sale, we'd need to store snapshots. 
-                  // For this simulation, we'll show current stock, but acknowledge this limitation.
-                  const remainingStock = item ? item.currentQuantity : 'N/A';
+                  const event = initialEvents.find(e => e.id === sale.eventId);
                   return (
                     <TableRow key={sale.id}>
                       <TableCell>{format(parseISO(sale.timestamp), 'Pp', { locale: fr })}</TableCell>
                       <TableCell className="font-medium">{item?.name || 'N/A'}</TableCell>
+                      <TableCell>{event?.name || <span className="text-muted-foreground">Aucun</span>}</TableCell>
                       <TableCell className="text-right">{sale.quantity}</TableCell>
                       <TableCell className="text-right">{sale.salePrice.toLocaleString('fr-CM', { style: 'currency', currency: 'XAF' })}</TableCell>
-                       <TableCell className="text-right">
-                        {item ? <Badge variant={item.currentQuantity < item.lowStockThreshold ? 'destructive' : 'secondary'}>{item.currentQuantity}</Badge> : 'N/A'}
-                       </TableCell>
                     </TableRow>
                   );
                 })}

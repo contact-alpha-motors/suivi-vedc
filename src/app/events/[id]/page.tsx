@@ -1,5 +1,5 @@
 import EventDetailsClient from '@/components/events/event-details-client';
-import { getEvent, getItems, getSalesForEvent } from '@/lib/data';
+import { getEvent, getItems, getSalesForEvent, getEventStocks } from '@/lib/data';
 import { notFound } from 'next/navigation';
 
 export default async function EventDetailsPage({ params }: { params: { id: string } }) {
@@ -9,9 +9,14 @@ export default async function EventDetailsPage({ params }: { params: { id: strin
     notFound();
   }
   
-  // We can pass promises directly to client components
   const itemsPromise = getItems();
   const salesPromise = getSalesForEvent(event.id);
+  const eventStocksPromise = getEventStocks(event.id);
 
-  return <EventDetailsClient event={event} itemsPromise={itemsPromise} salesPromise={salesPromise} />;
+  return <EventDetailsClient 
+    event={event} 
+    itemsPromise={itemsPromise} 
+    salesPromise={salesPromise}
+    eventStocksPromise={eventStocksPromise} 
+  />;
 }

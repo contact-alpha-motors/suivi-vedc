@@ -1,4 +1,4 @@
-import type { Item, Sale, Event } from './types';
+import type { Item, Sale, Event, EventStock } from './types';
 
 // Simulate a database
 let items: Item[] = [
@@ -22,6 +22,14 @@ let events: Omit<Event, 'date'> & { date: Date }[] = [
     { id: 'e1', name: 'Vente Anuelle', location: 'Paris', date: new Date('2024-09-15T09:00:00'), administrator: 'Jean Dupont' },
     { id: 'e2', name: 'Festival du Livre', location: 'Lyon', date: new Date('2024-10-20T10:00:00'), administrator: 'Marie Curie' },
     { id: 'e3', name: 'Marché de Noël', location: 'Strasbourg', date: new Date('2024-12-05T09:00:00'), administrator: 'Pierre Martin' },
+];
+
+let eventStocks: EventStock[] = [
+    { eventId: 'e1', itemId: '1', allocatedQuantity: 20 },
+    { eventId: 'e1', itemId: '2', allocatedQuantity: 30 },
+    { eventId: 'e2', itemId: '1', allocatedQuantity: 10 },
+    { eventId: 'e2', itemId: '2', allocatedQuantity: 50 },
+    { eventId: 'e2', itemId: '3', allocatedQuantity: 10 },
 ];
 
 const toJSON = <T extends { timestamp?: Date; date?: Date }>(obj: T) => {
@@ -67,6 +75,33 @@ export const getEvent = async (id: string): Promise<Event | undefined> => {
     return event ? toJSON(event) as Event : undefined;
 }
 
+export const getEventStocks = async (eventId: string): Promise<EventStock[]> => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    return eventStocks.filter(es => es.eventId === eventId);
+};
+
+export const allocateStockToEvent = async (eventId: string, itemId: string, quantity: number): Promise<EventStock> => {
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const item = items.find(i => i.id === itemId);
+    if (!item) throw new Error("Article non trouvé.");
+    if (item.currentQuantity < quantity) throw new Error("Stock central insuffisant.");
+
+    item.currentQuantity -= quantity;
+    
+    let eventStock = eventStocks.find(es => es.eventId === eventId && es.itemId === itemId);
+    if (eventStock) {
+        eventStock.allocatedQuantity += quantity;
+    } else {
+        eventStock = { eventId, itemId, allocatedQuantity: quantity };
+        eventStocks.push(eventStock);
+    }
+    
+    // Simulate updating the central item stock
+    await updateItem(item);
+
+    return { ...eventStock };
+}
+
 
 // These functions simulate mutations and would be replaced by API calls or offline storage logic
 export const addItem = async (item: Omit<Item, 'id'>): Promise<Item> => {
@@ -100,7 +135,16 @@ export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
     const item = await getItem(sale.itemId);
     if (!item) throw new Error('Item not found');
 
-    if (item.currentQuantity < sale.quantity) throw new Error(`Stock insuffisant pour ${item.name}`);
+    if (sale.eventId) {
+        const eventStock = eventStocks.find(es => es.eventId === sale.eventId && es.itemId === sale.itemId);
+        const salesForEventItem = sales.filter(s => s.eventId === sale.eventId && s.itemId === sale.itemId).reduce((sum, s) => sum + s.quantity, 0);
+        const eventStockAvailable = (eventStock?.allocatedQuantity || 0) - salesForEventItem;
+        if (eventStockAvailable < sale.quantity) throw new Error(`Stock d'événement insuffisant pour ${item.name}. Restant: ${eventStockAvailable}`);
+    } else {
+        if (item.currentQuantity < sale.quantity) throw new Error(`Stock central insuffisant pour ${item.name}`);
+        item.currentQuantity -= sale.quantity; // Deduct from central stock only if no event
+        await updateItem(item);
+    }
     
     const timestamp = sale.saleDate ? new Date(sale.saleDate) : new Date();
     // make sure timestamp also includes current time
@@ -121,8 +165,6 @@ export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
     };
     
     sales.unshift(newSaleData); // Add to beginning of array
-    item.currentQuantity -= sale.quantity;
-    await updateItem(item);
 
     return toJSON(newSaleData) as Sale;
 }
