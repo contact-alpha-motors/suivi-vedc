@@ -89,9 +89,9 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {totalRevenue.toLocaleString('fr-FR', {
+              {totalRevenue.toLocaleString('fr-CM', {
                 style: 'currency',
-                currency: 'EUR',
+                currency: 'XAF',
               })}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -165,7 +165,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
                 />
                 <YAxis
                   tickFormatter={(value) =>
-                    `€${Number(value).toLocaleString('fr-FR')}`
+                    `${Number(value).toLocaleString('fr-CM')} FCFA`
                   }
                   tickLine={false}
                   axisLine={false}
@@ -206,9 +206,9 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
-                        {sale.salePrice.toLocaleString('fr-FR', {
+                        {sale.salePrice.toLocaleString('fr-CM', {
                           style: 'currency',
-                          currency: 'EUR',
+                          currency: 'XAF',
                         })}
                       </TableCell>
                     </TableRow>

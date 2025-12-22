@@ -145,9 +145,9 @@ export default function InventoryClient({ initialItems }: InventoryClientProps) 
                   <TableCell className="font-medium">{item.name}</TableCell>
                   <TableCell className="text-muted-foreground max-w-sm truncate">{item.description}</TableCell>
                   <TableCell className="text-right">
-                    {item.price.toLocaleString('fr-FR', {
+                    {item.price.toLocaleString('fr-CM', {
                       style: 'currency',
-                      currency: 'EUR',
+                      currency: 'XAF',
                     })}
                   </TableCell>
                   <TableCell className="text-right">{item.currentQuantity}</TableCell>
@@ -200,7 +200,7 @@ export default function InventoryClient({ initialItems }: InventoryClientProps) 
                 <Textarea id="description" name="description" defaultValue={editingItem?.description} className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="price" className="text-right">Prix (€)</Label>
+                <Label htmlFor="price" className="text-right">Prix (FCFA)</Label>
                 <Input id="price" name="price" type="number" step="0.01" defaultValue={editingItem?.price} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">

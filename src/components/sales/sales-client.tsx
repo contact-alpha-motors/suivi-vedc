@@ -120,7 +120,7 @@ export default function SalesClient({ initialItems, initialSales }: SalesClientP
                       <TableCell>{new Date(sale.timestamp).toLocaleString('fr-FR')}</TableCell>
                       <TableCell className="font-medium">{item?.name || 'N/A'}</TableCell>
                       <TableCell className="text-right">{sale.quantity}</TableCell>
-                      <TableCell className="text-right">{sale.salePrice.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</TableCell>
+                      <TableCell className="text-right">{sale.salePrice.toLocaleString('fr-CM', { style: 'currency', currency: 'XAF' })}</TableCell>
                        <TableCell className="text-right">
                         {item ? <Badge variant={item.currentQuantity < item.lowStockThreshold ? 'destructive' : 'secondary'}>{item.currentQuantity}</Badge> : 'N/A'}
                        </TableCell>
