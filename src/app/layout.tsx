@@ -1,8 +1,10 @@
+
 import type { Metadata } from 'next';
 import './globals.css';
 import AppLayout from '@/components/layout/app-layout';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
+import AuthGuard from '@/components/layout/auth-guard';
 
 export const metadata: Metadata = {
   title: 'Suivi d\'Inventaire VEDC',
@@ -23,9 +25,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <FirebaseClientProvider>
-          <AppLayout>
-            {children}
-          </AppLayout>
+          <AuthGuard>
+            <AppLayout>
+              {children}
+            </AppLayout>
+          </AuthGuard>
         </FirebaseClientProvider>
         <Toaster />
       </body>
