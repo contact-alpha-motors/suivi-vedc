@@ -27,8 +27,8 @@ export default function Header() {
   const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar');
 
   const getTitle = () => {
-    if (pathname.startsWith('/events/') && pathname.endsWith('/record-sales')) {
-      return "Saisie des Ventes par Événement";
+    if (pathname.startsWith('/events/')) {
+        return "Détails de l'Événement";
     }
     return pageTitles[pathname] || 'Suivi d\'Inventaire VEDC';
   }

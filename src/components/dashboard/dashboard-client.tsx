@@ -156,7 +156,7 @@ export default function DashboardClient({ items, sales, events }: DashboardClien
         </Card>
         
         {upcomingEvent ? (
-          <Link href={`/events/${upcomingEvent.id}/record-sales`}>
+          <Link href={`/events/${upcomingEvent.id}`}>
             <UpcomingEventCard />
           </Link>
         ) : (

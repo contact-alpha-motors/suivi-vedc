@@ -14,6 +14,7 @@ export interface Sale {
   quantity: number;
   salePrice: number; // price at time of sale * quantity
   timestamp: string; // ISO 8601 string
+  eventId?: string;
 }
 
 export interface Event {

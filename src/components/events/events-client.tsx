@@ -78,7 +78,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
   const editingDateValue = editingEvent ? format(parseISO(editingEvent.date), "yyyy-MM-dd'T'HH:mm") : '';
 
   const handleRowClick = (eventId: string) => {
-    router.push(`/events/${eventId}/record-sales`);
+    router.push(`/events/${eventId}`);
   };
 
   return (
@@ -89,7 +89,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
             <div>
               <CardTitle>Gestion des Événements</CardTitle>
               <CardDescription>
-                Cliquez sur un événement pour enregistrer les ventes ou utilisez le menu pour d'autres actions.
+                Cliquez sur un événement pour voir les détails et enregistrer les ventes.
               </CardDescription>
             </div>
             <Button onClick={() => handleOpenDialog(null)}>

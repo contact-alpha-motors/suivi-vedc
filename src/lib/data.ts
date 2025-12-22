@@ -10,12 +10,12 @@ let items: Item[] = [
 ];
 
 let sales: Omit<Sale, 'timestamp'> & { timestamp: Date }[] = [
-    { id: 's1', itemId: '1', quantity: 2, salePrice: 30.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)) },
-    { id: 's2', itemId: '2', quantity: 5, salePrice: 50.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)) },
+    { id: 's1', itemId: '1', quantity: 2, salePrice: 30.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)), eventId: 'e1' },
+    { id: 's2', itemId: '2', quantity: 5, salePrice: 50.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 2)), eventId: 'e1' },
     { id: 's3', itemId: '1', quantity: 1, salePrice: 15.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 1)) },
-    { id: 's4', itemId: '3', quantity: 3, salePrice: 15.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 1)) },
+    { id: 's4', itemId: '3', quantity: 3, salePrice: 15.00, timestamp: new Date(new Date().setDate(new Date().getDate() - 1)), eventId: 'e2' },
     { id: 's5', itemId: '4', quantity: 1, salePrice: 25.00, timestamp: new Date() },
-    { id: 's6', itemId: '2', quantity: 10, salePrice: 100.00, timestamp: new Date() },
+    { id: 's6', itemId: '2', quantity: 10, salePrice: 100.00, timestamp: new Date(), eventId: 'e2' },
 ];
 
 let events: Omit<Event, 'date'> & { date: Date }[] = [
@@ -50,6 +50,11 @@ export const getSales = async (): Promise<Sale[]> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   return sales.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).map(toJSON) as Sale[];
 };
+
+export const getSalesForEvent = async(eventId: string): Promise<Sale[]> => {
+    await new Promise(resolve => setTimeout(resolve, 400));
+    return sales.filter(s => s.eventId === eventId).sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()).map(toJSON) as Sale[];
+}
 
 export const getEvents = async (): Promise<Event[]> => {
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -87,6 +92,7 @@ type AddSalePayload = {
     itemId: string;
     quantity: number;
     saleDate?: string;
+    eventId?: string;
 };
 
 export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
@@ -97,6 +103,13 @@ export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
     if (item.currentQuantity < sale.quantity) throw new Error(`Stock insuffisant pour ${item.name}`);
     
     const timestamp = sale.saleDate ? new Date(sale.saleDate) : new Date();
+    // make sure timestamp also includes current time
+    if (sale.saleDate) {
+        timestamp.setHours(new Date().getHours());
+        timestamp.setMinutes(new Date().getMinutes());
+        timestamp.setSeconds(new Date().getSeconds());
+    }
+
 
     const newSaleData = { 
         itemId: sale.itemId,
@@ -104,6 +117,7 @@ export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
         id: `${Date.now()}-${Math.random()}`, 
         timestamp: timestamp,
         salePrice: item.price * sale.quantity,
+        eventId: sale.eventId,
     };
     
     sales.unshift(newSaleData); // Add to beginning of array
