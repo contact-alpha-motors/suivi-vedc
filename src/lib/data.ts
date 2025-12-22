@@ -25,18 +25,6 @@ const salesCollection = collection(db, 'sales');
 const eventsCollection = collection(db, 'events');
 const eventStocksCollection = collection(db, 'eventStocks');
 
-const fromFirestore = <T extends { timestamp?: Timestamp; date?: Timestamp }>(doc: any): T => {
-    const data = doc.data();
-    const result: any = { ...data, id: doc.id };
-    if (data.timestamp && data.timestamp instanceof Timestamp) {
-      result.timestamp = data.timestamp.toDate().toISOString();
-    }
-    if (data.date && data.date instanceof Timestamp) {
-      result.date = data.date.toDate().toISOString();
-    }
-    return result as T;
-};
-
 // --- Item Functions ---
 export const getItems = async (): Promise<Item[]> => {
   const snapshot = await getDocs(itemsCollection);
@@ -68,17 +56,6 @@ export const deleteItem = async (id: string): Promise<{ success: boolean }> => {
 
 
 // --- Sale Functions ---
-export const getSales = async (): Promise<SaleWithISOString[]> => {
-  const snapshot = await getDocs(query(salesCollection));
-  return snapshot.docs.map(doc => fromFirestore<SaleWithISOString>(doc));
-};
-
-export const getSalesForEvent = async (eventId: string): Promise<SaleWithISOString[]> => {
-  const q = query(salesCollection, where('eventId', '==', eventId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => fromFirestore<SaleWithISOString>(doc));
-};
-
 type AddSalePayload = {
   itemId: string;
   quantity: number;
@@ -86,7 +63,7 @@ type AddSalePayload = {
   eventId?: string;
 };
 
-export const addSale = async (sale: AddSalePayload): Promise<SaleWithISOString> => {
+export const addSale = async (sale: AddSalePayload): Promise<Sale> => {
   const item = await getItem(sale.itemId);
   if (!item) throw new Error('Item not found');
 
@@ -143,39 +120,27 @@ export const addSale = async (sale: AddSalePayload): Promise<SaleWithISOString> 
   return { 
     ...newSaleData, 
     id: saleDocRef.id, 
-    timestamp: newSaleData.timestamp.toDate().toISOString() 
   };
 };
 
 // --- Event Functions ---
-export const getEvents = async (): Promise<EventWithISOString[]> => {
-  const snapshot = await getDocs(eventsCollection);
-  return snapshot.docs.map(doc => fromFirestore<EventWithISOString>(doc));
-};
-
-export const getEvent = async (id: string): Promise<EventWithISOString | undefined> => {
-  const docRef = doc(db, 'events', id);
-  const docSnap = await getDoc(docRef);
-  return docSnap.exists() ? fromFirestore<EventWithISOString>(docSnap) : undefined;
-};
-
-export const addEvent = async (event: Omit<Event, 'id' | 'date'> & { date: Date }): Promise<EventWithISOString> => {
+export const addEvent = async (event: Omit<Event, 'id' | 'date'> & { date: Date }): Promise<Event> => {
   const newEventData = {
     ...event,
     date: Timestamp.fromDate(event.date),
   };
   const docRef = await addDoc(eventsCollection, newEventData);
-  return { ...event, id: docRef.id, date: event.date.toISOString() };
+  return { ...event, id: docRef.id };
 };
 
-export const updateEvent = async (updatedEventData: Omit<Event, 'date'> & { date: Date }): Promise<EventWithISOString> => {
+export const updateEvent = async (updatedEventData: Omit<Event, 'date'> & { date: Date }): Promise<Event> => {
   const docRef = doc(db, 'events', updatedEventData.id);
   const dataToUpdate = {
     ...updatedEventData,
     date: Timestamp.fromDate(updatedEventData.date),
   };
   await updateDoc(docRef, dataToUpdate);
-  return { ...updatedEventData, date: updatedEventData.date.toISOString() };
+  return updatedEventData;
 };
 
 export const deleteEvent = async (id: string): Promise<{ success: boolean }> => {
@@ -191,12 +156,6 @@ export const deleteEvent = async (id: string): Promise<{ success: boolean }> => 
 };
 
 // --- EventStock Functions ---
-export const getEventStocks = async (eventId: string): Promise<EventStock[]> => {
-  const q = query(eventStocksCollection, where('eventId', '==', eventId));
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as EventStock));
-};
-
 export const allocateStockToEvent = async (eventId: string, itemId: string, quantity: number): Promise<EventStock> => {
   const item = await getItem(itemId);
   if (!item) throw new Error("Article non trouvé.");

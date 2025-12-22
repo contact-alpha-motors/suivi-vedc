@@ -30,14 +30,6 @@ export interface Event {
   id: string;
   name: string;
   location: string;
-  date: Timestamp | Date;
+  date: Timestamp;
   administrator: string;
-}
-
-// For UI state, we often need the string version
-export interface SaleWithISOString extends Omit<Sale, 'timestamp'> {
-  timestamp: string;
-}
-export interface EventWithISOString extends Omit<Event, 'date'> {
-  date: string;
 }

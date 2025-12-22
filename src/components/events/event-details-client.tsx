@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { Item, SaleWithISOString, EventWithISOString, EventStock } from '@/lib/types';
+import type { Item, Sale, Event, EventStock } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,12 +10,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { addSale, allocateStockToEvent } from '@/lib/data';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ArrowLeft, Calendar, User, MapPin, PlusCircle, PackagePlus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@/firebase';
-import { collection, doc, query, where } from 'firebase/firestore';
+import { collection, doc, query, where, Timestamp } from 'firebase/firestore';
 
 type EventDetailsClientProps = {
   eventId: string;
@@ -32,7 +32,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
     () => (firestore && user ? doc(firestore, 'events', eventId) : null),
     [firestore, user, eventId]
   );
-  const { data: event, isLoading: eventLoading } = useDoc<EventWithISOString>(eventDocRef);
+  const { data: event, isLoading: eventLoading } = useDoc<Event>(eventDocRef);
 
   const itemsQuery = useMemoFirebase(
     () => (firestore && user ? collection(firestore, 'inventoryItems') : null),
@@ -41,7 +41,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
   const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
 
   const salesQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'sales'), where('eventId', '==', eventId)) : null), [firestore, user, eventId]);
-  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
+  const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
   
   const eventStocksQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'eventStocks'), where('eventId', '==', eventId)) : null), [firestore, user, eventId]);
   const { data: eventStocks, isLoading: eventStocksLoading } = useCollection<EventStock>(eventStocksQuery);
@@ -83,7 +83,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
       await Promise.all(promises);
 
       setSalesInput({});
-      toast({ title: 'Succès', description: `${salesToRecord.length} vente(s) enregistrée(s) pour le ${format(parseISO(saleDate), 'dd/MM/yyyy')}.` });
+      toast({ title: 'Succès', description: `${salesToRecord.length} vente(s) enregistrée(s) pour le ${format(new Date(saleDate), 'dd/MM/yyyy')}.` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: error.message || 'Impossible d\'enregistrer les ventes.' });
     } finally {
@@ -117,9 +117,9 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
 
   const salesByDay = useMemo(() => {
     if (!sales) return [];
-    const grouped: { [key: string]: SaleWithISOString[] } = {};
+    const grouped: { [key: string]: Sale[] } = {};
     sales.forEach(sale => {
-      const day = format(parseISO(sale.timestamp), 'yyyy-MM-dd');
+      const day = format(sale.timestamp.toDate(), 'yyyy-MM-dd');
       if (!grouped[day]) grouped[day] = [];
       grouped[day].push(sale);
     });
@@ -159,7 +159,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                 <CardTitle className="text-3xl">{event.name}</CardTitle>
                 <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground mt-2">
                     <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /><span>{event.location}</span></div>
-                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span>{format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr })}</span></div>
+                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span>{format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr })}</span></div>
                     <div className="flex items-center gap-2"><User className="h-4 w-4" /><span>{event.administrator}</span></div>
                 </div>
             </div>
@@ -262,7 +262,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                         <div className="space-y-6">
                         {salesByDay.map(([day, daySales]) => (
                             <div key={day}>
-                                <h3 className="font-semibold mb-2 text-lg">{format(parseISO(day), "eeee dd MMMM yyyy", { locale: fr })}</h3>
+                                <h3 className="font-semibold mb-2 text-lg">{format(new Date(day), "eeee dd MMMM yyyy", { locale: fr })}</h3>
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
@@ -277,7 +277,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                                             const item = items?.find(i => i.id === sale.itemId);
                                             return (
                                                 <TableRow key={sale.id}>
-                                                    <TableCell>{format(parseISO(sale.timestamp), 'HH:mm', { locale: fr })}</TableCell>
+                                                    <TableCell>{format(sale.timestamp.toDate(), 'HH:mm', { locale: fr })}</TableCell>
                                                     <TableCell className="font-medium">{item?.name || 'N/A'}</TableCell>
                                                     <TableCell className="text-right">{sale.quantity}</TableCell>
                                                     <TableCell className="text-right">{sale.salePrice.toLocaleString('fr-CM', { style: 'currency', currency: 'XAF' })}</TableCell>

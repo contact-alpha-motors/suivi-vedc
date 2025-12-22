@@ -1,6 +1,6 @@
 'use client';
 
-import type { Item, SaleWithISOString, EventWithISOString } from '@/lib/types';
+import type { Item, Sale, Event } from '@/lib/types';
 import {
   Card,
   CardContent,
@@ -33,11 +33,11 @@ import {
   Loader2,
 } from 'lucide-react';
 import { useMemo } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
 import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, Timestamp } from 'firebase/firestore';
 
 const chartConfig = {
   revenue: {
@@ -60,13 +60,13 @@ export default function DashboardClient() {
     () => (firestore && user ? collection(firestore, 'sales') : null),
     [firestore, user]
   );
-  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
+  const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
 
   const eventsQuery = useMemoFirebase(
     () => (firestore && user ? collection(firestore, 'events') : null),
     [firestore, user]
   );
-  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(eventsQuery);
+  const { data: events, isLoading: eventsLoading } = useCollection<Event>(eventsQuery);
 
 
   const { totalRevenue, totalSales, lowStockItems } = useMemo(() => {
@@ -83,7 +83,7 @@ export default function DashboardClient() {
     if (!sales) return [];
     const data: { [key: string]: number } = {};
     sales.forEach((sale) => {
-      const day = format(parseISO(sale.timestamp), 'eee', { locale: fr });
+      const day = format(sale.timestamp.toDate(), 'eee', { locale: fr });
       if (!data[day]) {
         data[day] = 0;
       }
@@ -99,9 +99,8 @@ export default function DashboardClient() {
 
   const mostRecentEvent = useMemo(() => {
     if (!events || events.length === 0) return undefined;
-    return events
-    .map(e => ({...e, date: parseISO(e.date)}))
-    .sort((a,b) => b.date.getTime() - a.date.getTime())[0];
+    return [...events]
+    .sort((a,b) => (b.date as Timestamp).toMillis() - (a.date as Timestamp).toMillis())[0];
   }, [events]);
 
   const isLoading = isUserLoading || itemsLoading || salesLoading || eventsLoading;
@@ -121,7 +120,7 @@ export default function DashboardClient() {
             <>
             <div className="text-lg font-bold">{mostRecentEvent.name}</div>
             <p className="text-xs text-muted-foreground">
-                {format(mostRecentEvent.date, 'dd MMMM yyyy', { locale: fr })} à {mostRecentEvent.location}
+                {format(mostRecentEvent.date.toDate(), 'dd MMMM yyyy', { locale: fr })} à {mostRecentEvent.location}
             </p>
             </>
         ) : (
@@ -245,7 +244,7 @@ export default function DashboardClient() {
                       <TableCell>
                         <div className="font-medium">{item?.name || 'N/A'}</div>
                         <div className="text-sm text-muted-foreground">
-                          {format(parseISO(sale.timestamp), 'Pp', { locale: fr })}
+                          {format(sale.timestamp.toDate(), 'Pp', { locale: fr })}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

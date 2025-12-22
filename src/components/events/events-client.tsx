@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import type { EventWithISOString } from '@/lib/types';
+import type { Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -16,7 +16,7 @@ import { Input } from '@/components/ui/input';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, Timestamp } from 'firebase/firestore';
 
 export default function EventsClient() {
   const firestore = useFirestore();
@@ -26,14 +26,14 @@ export default function EventsClient() {
     () => (firestore && user ? collection(firestore, 'events') : null),
     [firestore, user]
   );
-  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(eventsQuery);
+  const { data: events, isLoading: eventsLoading } = useCollection<Event>(eventsQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingEvent, setEditingEvent] = useState<EventWithISOString | null>(null);
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const { toast } = useToast();
   const router = useRouter();
 
-  const handleOpenDialog = (event: EventWithISOString | null) => {
+  const handleOpenDialog = (event: Event | null) => {
     setEditingEvent(event);
     setIsDialogOpen(true);
   };
@@ -74,7 +74,7 @@ export default function EventsClient() {
     }
   };
   
-  const editingDateValue = editingEvent ? format(parseISO(editingEvent.date), "yyyy-MM-dd") : '';
+  const editingDateValue = editingEvent ? format(editingEvent.date.toDate(), "yyyy-MM-dd") : '';
 
   const handleRowClick = (eventId: string) => {
     router.push(`/events/${eventId}`);
@@ -82,7 +82,7 @@ export default function EventsClient() {
   
   const sortedEvents = useMemo(() => {
     if (!events) return [];
-    return [...events].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
+    return [...events].sort((a, b) => (b.date as Timestamp).toMillis() - (a.date as Timestamp).toMillis());
   }, [events]);
 
   const isLoading = isUserLoading || eventsLoading;
@@ -127,7 +127,7 @@ export default function EventsClient() {
                 >
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>{format(typeof event.date === 'string' ? parseISO(event.date) : event.date, 'dd MMMM yyyy', { locale: fr })}</TableCell>
+                  <TableCell>{format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr })}</TableCell>
                   <TableCell>{event.administrator}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import type { Item, SaleWithISOString, EventWithISOString } from '@/lib/types';
+import type { Item, Sale, Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,10 +11,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { addSale } from '@/lib/data';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, Timestamp } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
 
@@ -32,13 +32,13 @@ export default function SalesClient() {
     () => (firestore && user ? collection(firestore, 'sales') : null),
     [firestore, user]
   );
-  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
+  const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
 
   const eventsQuery = useMemoFirebase(
     () => (firestore && user ? collection(firestore, 'events') : null),
     [firestore, user]
   );
-  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(eventsQuery);
+  const { data: events, isLoading: eventsLoading } = useCollection<Event>(eventsQuery);
 
   const { toast } = useToast();
 
@@ -66,7 +66,7 @@ export default function SalesClient() {
 
   const sortedSales = useMemo(() => {
     if (!sales) return [];
-    return [...sales].sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime());
+    return [...sales].sort((a, b) => (b.timestamp as Timestamp).toMillis() - (a.timestamp as Timestamp).toMillis());
   }, [sales]);
 
   const isLoading = isUserLoading || itemsLoading || salesLoading || eventsLoading;
@@ -154,7 +154,7 @@ export default function SalesClient() {
                   const event = events?.find(e => e.id === sale.eventId);
                   return (
                     <TableRow key={sale.id}>
-                      <TableCell>{format(parseISO(sale.timestamp), 'Pp', { locale: fr })}</TableCell>
+                      <TableCell>{format(sale.timestamp.toDate(), 'Pp', { locale: fr })}</TableCell>
                       <TableCell className="font-medium">{item?.name || 'N/A'}</TableCell>
                       <TableCell>{event?.name || <span className="text-muted-foreground">Aucun</span>}</TableCell>
                       <TableCell className="text-right">{sale.quantity}</TableCell>
