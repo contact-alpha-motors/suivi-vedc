@@ -127,7 +127,7 @@ export default function EventsClient() {
                 >
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>{format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr })}</TableCell>
+                  <TableCell>{format(typeof event.date === 'string' ? parseISO(event.date) : event.date, 'dd MMMM yyyy', { locale: fr })}</TableCell>
                   <TableCell>{event.administrator}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

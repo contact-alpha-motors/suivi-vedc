@@ -30,7 +30,7 @@ export interface Event {
   id: string;
   name: string;
   location: string;
-  date: Timestamp;
+  date: Timestamp | Date;
   administrator: string;
 }
 
