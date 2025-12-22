@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +26,11 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleOpenDialog = (event: Event | null) => {
     setEditingEvent(event);
@@ -105,7 +110,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                 <TableRow key={event.id}>
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>{format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr })}</TableCell>
+                  <TableCell>{isClient ? format(parseISO(event.date), 'dd MMMM yyyy', { locale: fr }) : ''}</TableCell>
                   <TableCell>{event.administrator}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
