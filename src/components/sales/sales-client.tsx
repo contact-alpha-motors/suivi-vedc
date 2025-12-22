@@ -13,22 +13,32 @@ import { useToast } from '@/hooks/use-toast';
 import { addSale } from '@/lib/data';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 
 
 export default function SalesClient() {
   const firestore = useFirestore();
-  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
-    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  const { user, isUserLoading } = useUser();
+
+  const itemsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'inventoryItems') : null),
+    [firestore, user]
   );
-  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(
-    useMemoFirebase(() => collection(firestore, 'sales'), [firestore])
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
+
+  const salesQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'sales') : null),
+    [firestore, user]
   );
-  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(
-    useMemoFirebase(() => collection(firestore, 'events'), [firestore])
+  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
+
+  const eventsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'events') : null),
+    [firestore, user]
   );
+  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(eventsQuery);
 
   const { toast } = useToast();
 
@@ -59,7 +69,7 @@ export default function SalesClient() {
     return [...sales].sort((a, b) => parseISO(b.timestamp).getTime() - parseISO(a.timestamp).getTime());
   }, [sales]);
 
-  const isLoading = itemsLoading || salesLoading || eventsLoading;
+  const isLoading = isUserLoading || itemsLoading || salesLoading || eventsLoading;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;

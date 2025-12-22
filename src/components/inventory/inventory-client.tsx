@@ -43,15 +43,19 @@ import {
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 
 export default function InventoryClient() {
   const firestore = useFirestore();
-  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
-    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  const { user, isUserLoading } = useUser();
+
+  const itemsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'inventoryItems') : null),
+    [firestore, user]
   );
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
@@ -110,7 +114,9 @@ export default function InventoryClient() {
     }
   };
   
-  if (itemsLoading) {
+  const isLoading = isUserLoading || itemsLoading;
+
+  if (isLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 

@@ -15,14 +15,18 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 export default function EventsClient() {
   const firestore = useFirestore();
-  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(
-    useMemoFirebase(() => collection(firestore, 'events'), [firestore])
+  const { user, isUserLoading } = useUser();
+
+  const eventsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'events') : null),
+    [firestore, user]
   );
+  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(eventsQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<EventWithISOString | null>(null);
@@ -86,7 +90,9 @@ export default function EventsClient() {
     return [...events].sort((a, b) => parseISO(b.date).getTime() - parseISO(a.date).getTime());
   }, [events]);
 
-  if (eventsLoading) {
+  const isLoading = isUserLoading || eventsLoading;
+
+  if (isLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 

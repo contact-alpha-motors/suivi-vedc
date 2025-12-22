@@ -14,7 +14,7 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { ArrowLeft, Calendar, User, MapPin, PlusCircle, PackagePlus, Loader2 } from 'lucide-react';
 import Link from 'next/link';
-import { useFirestore, useCollection, useDoc, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { collection, doc, query, where } from 'firebase/firestore';
 
 type EventDetailsClientProps = {
@@ -26,19 +26,24 @@ type StockAllocationInput = { [itemId: string]: number };
 
 export default function EventDetailsClient({ eventId }: EventDetailsClientProps) {
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
   
-  const { data: event, isLoading: eventLoading } = useDoc<EventWithISOString>(
-    useMemoFirebase(() => doc(firestore, 'events', eventId), [firestore, eventId])
+  const eventDocRef = useMemoFirebase(
+    () => (firestore && user ? doc(firestore, 'events', eventId) : null),
+    [firestore, user, eventId]
   );
+  const { data: event, isLoading: eventLoading } = useDoc<EventWithISOString>(eventDocRef);
 
-  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
-    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  const itemsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'inventoryItems') : null),
+    [firestore, user]
   );
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
 
-  const salesQuery = useMemoFirebase(() => query(collection(firestore, 'sales'), where('eventId', '==', eventId)), [firestore, eventId]);
+  const salesQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'sales'), where('eventId', '==', eventId)) : null), [firestore, user, eventId]);
   const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
   
-  const eventStocksQuery = useMemoFirebase(() => query(collection(firestore, 'eventStocks'), where('eventId', '==', eventId)), [firestore, eventId]);
+  const eventStocksQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'eventStocks'), where('eventId', '==', eventId)) : null), [firestore, user, eventId]);
   const { data: eventStocks, isLoading: eventStocksLoading } = useCollection<EventStock>(eventStocksQuery);
 
   const [salesInput, setSalesInput] = useState<SalesInput>({});
@@ -132,7 +137,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
     });
   }, [items, sales, eventStocks]);
   
-  const isLoading = eventLoading || itemsLoading || salesLoading || eventStocksLoading;
+  const isLoading = isUserLoading || eventLoading || itemsLoading || salesLoading || eventStocksLoading;
 
   if (isLoading) {
     return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;

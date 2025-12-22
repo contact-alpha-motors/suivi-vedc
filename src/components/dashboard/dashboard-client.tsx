@@ -36,7 +36,7 @@ import { useMemo } from 'react';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Link from 'next/link';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection } from 'firebase/firestore';
 
 const chartConfig = {
@@ -48,16 +48,26 @@ const chartConfig = {
 
 export default function DashboardClient() {
   const firestore = useFirestore();
+  const { user, isUserLoading } = useUser();
 
-  const { data: items, isLoading: itemsLoading } = useCollection<Item>(
-    useMemoFirebase(() => collection(firestore, 'inventoryItems'), [firestore])
+  const itemsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'inventoryItems') : null),
+    [firestore, user]
   );
-  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(
-    useMemoFirebase(() => collection(firestore, 'sales'), [firestore])
+  const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
+
+  const salesQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'sales') : null),
+    [firestore, user]
   );
-  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(
-    useMemoFirebase(() => collection(firestore, 'events'), [firestore])
+  const { data: sales, isLoading: salesLoading } = useCollection<SaleWithISOString>(salesQuery);
+
+  const eventsQuery = useMemoFirebase(
+    () => (firestore && user ? collection(firestore, 'events') : null),
+    [firestore, user]
   );
+  const { data: events, isLoading: eventsLoading } = useCollection<EventWithISOString>(eventsQuery);
+
 
   const { totalRevenue, totalSales, lowStockItems } = useMemo(() => {
     if (!items || !sales) return { totalRevenue: 0, totalSales: 0, lowStockItems: [] };
@@ -94,7 +104,7 @@ export default function DashboardClient() {
     .sort((a,b) => b.date.getTime() - a.date.getTime())[0];
   }, [events]);
 
-  const isLoading = itemsLoading || salesLoading || eventsLoading;
+  const isLoading = isUserLoading || itemsLoading || salesLoading || eventsLoading;
   
   if (isLoading) {
       return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
@@ -290,5 +300,3 @@ export default function DashboardClient() {
     </div>
   );
 }
-
-    
