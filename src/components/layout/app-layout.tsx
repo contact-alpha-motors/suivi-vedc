@@ -20,8 +20,10 @@ import {
   DollarSign,
   LayoutDashboard,
   Building,
+  Loader2,
 } from 'lucide-react';
 import Header from './header';
+import { useUser } from '@/firebase';
 
 const navItems = [
   { href: '/', label: 'Tableau de Bord', icon: LayoutDashboard },
@@ -32,11 +34,15 @@ const navItems = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { user, isUserLoading } = useUser();
 
   // Don't render layout for login page
   if (pathname === '/login') {
     return <>{children}</>;
   }
+  
+  const showLoader = isUserLoading || !user;
+
 
   return (
     <SidebarProvider>
@@ -70,7 +76,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <SidebarInset>
         <Header />
         <main className="flex-1 p-4 md:p-6 lg:p-8 bg-background">
-          {children}
+          {showLoader ? (
+             <div className="flex justify-center items-center h-full">
+                <Loader2 className="h-8 w-8 animate-spin" />
+             </div>
+          ) : (
+            children
+          )}
         </main>
       </SidebarInset>
     </SidebarProvider>
