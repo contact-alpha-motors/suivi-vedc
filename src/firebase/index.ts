@@ -3,46 +3,50 @@
 
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, Auth } from 'firebase/auth';
 import { 
   initializeFirestore, 
   getFirestore, 
   persistentLocalCache, 
-  persistentMultipleTabManager 
+  persistentMultipleTabManager,
+  Firestore 
 } from 'firebase/firestore';
 
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  if (!getApps().length) {
-    let firebaseApp;
-    try {
-      firebaseApp = initializeApp();
-    } catch (e) {
-      if (process.env.NODE_ENV === "production") {
-        console.warn('Automatic initialization failed. Falling back to firebase config object.', e);
-      }
-      firebaseApp = initializeApp(firebaseConfig);
-    }
+// Singleton pour éviter les doubles initialisations
+let firestoreInstance: Firestore | null = null;
+let authInstance: Auth | null = null;
 
-    return getSdks(firebaseApp);
+export function initializeFirebase() {
+  let app: FirebaseApp;
+  
+  if (!getApps().length) {
+    app = initializeApp(firebaseConfig);
+  } else {
+    app = getApp();
   }
 
-  return getSdks(getApp());
-}
+  // Initialisation sécurisée de Firestore avec cache persistant
+  if (!firestoreInstance) {
+    try {
+      firestoreInstance = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+          tabManager: persistentMultipleTabManager()
+        })
+      });
+    } catch (e) {
+      // En cas d'erreur (déjà initialisé), on récupère l'instance existante
+      firestoreInstance = getFirestore(app);
+    }
+  }
 
-export function getSdks(firebaseApp: FirebaseApp) {
-  // Initialisation de Firestore avec cache persistant (IndexedDB)
-  // Cela permet le fonctionnement hors ligne et la synchronisation automatique
-  const firestore = initializeFirestore(firebaseApp, {
-    localCache: persistentLocalCache({
-      tabManager: persistentMultipleTabManager()
-    })
-  });
+  if (!authInstance) {
+    authInstance = getAuth(app);
+  }
 
   return {
-    firebaseApp,
-    auth: getAuth(firebaseApp),
-    firestore: firestore
+    firebaseApp: app,
+    auth: authInstance,
+    firestore: firestoreInstance
   };
 }
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -40,10 +41,16 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
   );
   const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
 
-  const salesQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'sales'), where('eventId', '==', eventId)) : null), [firestore, user, eventId]);
+  const salesQuery = useMemoFirebase(
+    () => (firestore && user ? query(collection(firestore, 'sales'), where('eventId', '==', eventId)) : null), 
+    [firestore, user, eventId]
+  );
   const { data: sales, isLoading: salesLoading } = useCollection<Sale>(salesQuery);
   
-  const eventStocksQuery = useMemoFirebase(() => (firestore && user ? query(collection(firestore, 'eventStocks'), where('eventId', '==', eventId)) : null), [firestore, user, eventId]);
+  const eventStocksQuery = useMemoFirebase(
+    () => (firestore && user ? query(collection(firestore, 'eventStocks'), where('eventId', '==', eventId)) : null), 
+    [firestore, user, eventId]
+  );
   const { data: eventStocks, isLoading: eventStocksLoading } = useCollection<EventStock>(eventStocksQuery);
 
   const [salesInput, setSalesInput] = useState<SalesInput>({});
@@ -83,7 +90,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
       await Promise.all(promises);
 
       setSalesInput({});
-      toast({ title: 'Succès', description: `${salesToRecord.length} vente(s) enregistrée(s) pour le ${format(new Date(saleDate), 'dd/MM/yyyy')}.` });
+      toast({ title: 'Succès', description: `${salesToRecord.length} vente(s) enregistrée(s).` });
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: error.message || 'Impossible d\'enregistrer les ventes.' });
     } finally {
@@ -102,11 +109,8 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
     setIsSubmittingStock(itemId);
     try {
       await allocateStockToEvent(event.id, itemId, quantity);
-      const centralItem = items?.find(i => i.id === itemId)!;
-      
       setStockAllocationInput(prev => ({...prev, [itemId]: 0}));
-      toast({ title: 'Succès', description: `${quantity} unité(s) de "${centralItem.name}" allouée(s) à l'événement.`});
-
+      toast({ title: 'Succès', description: 'Stock alloué à l\'événement.'});
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Erreur', description: error.message || "Impossible d'allouer le stock."});
     } finally {
@@ -114,12 +118,12 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
     }
   };
 
-
   const salesByDay = useMemo(() => {
     if (!sales) return [];
     const grouped: { [key: string]: Sale[] } = {};
     sales.forEach(sale => {
-      const day = format(sale.timestamp.toDate(), 'yyyy-MM-dd');
+      const date = sale.timestamp instanceof Timestamp ? sale.timestamp.toDate() : new Date();
+      const day = format(date, 'yyyy-MM-dd');
       if (!grouped[day]) grouped[day] = [];
       grouped[day].push(sale);
     });
@@ -159,7 +163,10 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                 <CardTitle className="text-3xl">{event.name}</CardTitle>
                 <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground mt-2">
                     <div className="flex items-center gap-2"><MapPin className="h-4 w-4" /><span>{event.location}</span></div>
-                    <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span>{format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr })}</span></div>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>{event.date instanceof Timestamp ? format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr }) : 'Date inconnue'}</span>
+                    </div>
                     <div className="flex items-center gap-2"><User className="h-4 w-4" /><span>{event.administrator}</span></div>
                 </div>
             </div>
@@ -177,7 +184,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
             <Card>
                 <CardHeader>
                     <CardTitle>Enregistrement groupé des ventes</CardTitle>
-                    <CardDescription>Saisissez les quantités vendues pour chaque article à la date sélectionnée. Les quantités sont déduites du stock de l'événement.</CardDescription>
+                    <CardDescription>Saisissez les quantités vendues pour chaque article.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     <div className="grid gap-6">
@@ -207,7 +214,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                     </Table>
                     <Button onClick={handleBulkRecordSales} className="w-full" disabled={isSubmittingSale}>
                         {isSubmittingSale ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-                        {isSubmittingSale ? 'Enregistrement...' : 'Enregistrer les ventes du jour'}
+                        {isSubmittingSale ? 'Enregistrement...' : 'Enregistrer les ventes'}
                     </Button>
                     </div>
                 </CardContent>
@@ -217,7 +224,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
           <Card>
             <CardHeader>
               <CardTitle>Gestion du Stock de l'Événement</CardTitle>
-              <CardDescription>Allouez des articles du stock central à cet événement. Le stock de l'événement est utilisé pour les ventes.</CardDescription>
+              <CardDescription>Allouez des articles du stock central à cet événement.</CardDescription>
             </CardHeader>
             <CardContent>
                <Table>
@@ -225,7 +232,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                     <TableRow>
                       <TableHead>Article</TableHead>
                       <TableHead>Stock Central</TableHead>
-                      <TableHead>Alloué à l'Événement</TableHead>
+                      <TableHead>Alloué</TableHead>
                       <TableHead className="w-48">Quantité à Ajouter</TableHead>
                       <TableHead className="text-right"></TableHead>
                     </TableRow>
@@ -254,8 +261,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
         <TabsContent value="history" className="mt-4">
             <Card>
                 <CardHeader>
-                    <CardTitle>Ventes de l'événement</CardTitle>
-                    <CardDescription>Historique complet des ventes pour "{event.name}".</CardDescription>
+                    <CardTitle>Historique des ventes</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {salesByDay.length > 0 ? (
@@ -275,9 +281,10 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                                     <TableBody>
                                         {daySales.map(sale => {
                                             const item = items?.find(i => i.id === sale.itemId);
+                                            const timeStr = sale.timestamp instanceof Timestamp ? format(sale.timestamp.toDate(), 'HH:mm', { locale: fr }) : '--:--';
                                             return (
                                                 <TableRow key={sale.id}>
-                                                    <TableCell>{format(sale.timestamp.toDate(), 'HH:mm', { locale: fr })}</TableCell>
+                                                    <TableCell>{timeStr}</TableCell>
                                                     <TableCell className="font-medium">{item?.name || 'N/A'}</TableCell>
                                                     <TableCell className="text-right">{sale.quantity}</TableCell>
                                                     <TableCell className="text-right">{sale.salePrice.toLocaleString('fr-CM', { style: 'currency', currency: 'XAF' })}</TableCell>
@@ -290,7 +297,7 @@ export default function EventDetailsClient({ eventId }: EventDetailsClientProps)
                         ))}
                         </div>
                     ) : (
-                        <p className="text-muted-foreground text-center py-8">Aucune vente enregistrée pour cet événement.</p>
+                        <p className="text-muted-foreground text-center py-8">Aucune vente enregistrée.</p>
                     )}
                 </CardContent>
             </Card>

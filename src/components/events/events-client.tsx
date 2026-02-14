@@ -1,6 +1,7 @@
+
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { addEvent, updateEvent, deleteEvent as deleteEventAction } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, Timestamp } from 'firebase/firestore';
@@ -55,7 +56,7 @@ export default function EventsClient() {
     const eventData = {
         name: data.name,
         location: data.location,
-        date: new Date(data.date),
+        date: new Date(data.date), // Sera converti en Timestamp par addEvent/updateEvent
         administrator: data.administrator,
     };
 
@@ -74,7 +75,7 @@ export default function EventsClient() {
     }
   };
   
-  const editingDateValue = editingEvent ? format(editingEvent.date.toDate(), "yyyy-MM-dd") : '';
+  const editingDateValue = editingEvent?.date ? format(editingEvent.date.toDate(), "yyyy-MM-dd") : '';
 
   const handleRowClick = (eventId: string) => {
     router.push(`/events/${eventId}`);
@@ -82,7 +83,11 @@ export default function EventsClient() {
   
   const sortedEvents = useMemo(() => {
     if (!events) return [];
-    return [...events].sort((a, b) => (b.date as Timestamp).toMillis() - (a.date as Timestamp).toMillis());
+    return [...events].sort((a, b) => {
+      const dateA = a.date instanceof Timestamp ? a.date.toMillis() : 0;
+      const dateB = b.date instanceof Timestamp ? b.date.toMillis() : 0;
+      return dateB - dateA;
+    });
   }, [events]);
 
   const isLoading = isUserLoading || eventsLoading;
@@ -127,7 +132,11 @@ export default function EventsClient() {
                 >
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>{format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr })}</TableCell>
+                  <TableCell>
+                    {event.date instanceof Timestamp 
+                      ? format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr })
+                      : 'Date invalide'}
+                  </TableCell>
                   <TableCell>{event.administrator}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
@@ -135,7 +144,7 @@ export default function EventsClient() {
                         <Button 
                           variant="ghost" 
                           className="h-8 w-8 p-0"
-                          onClick={(e) => e.stopPropagation()} // Prevent row click
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <span className="sr-only">Ouvrir le menu</span>
                           <MoreHorizontal className="h-4 w-4" />
