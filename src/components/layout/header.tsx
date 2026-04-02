@@ -1,4 +1,3 @@
-
 'use client';
 
 import { SidebarTrigger } from '@/components/ui/sidebar';
@@ -18,6 +17,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { useAuth, useUser } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { useToast } from '@/hooks/use-toast';
+import { ConnectivityStatus } from './connectivity-status';
 
 const pageTitles: { [key: string]: string } = {
   '/': 'Tableau de Bord',
@@ -37,7 +37,6 @@ export default function Header() {
     try {
       await signOut(auth);
       toast({ title: 'Déconnexion réussie.' });
-      // AuthGuard will handle redirection
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erreur de déconnexion' });
     }
@@ -57,15 +56,20 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-card px-4 md:px-6">
-      <div className="md:hidden">
-        <SidebarTrigger />
+      <div className="flex items-center gap-3">
+        <div className="md:hidden">
+          <SidebarTrigger />
+        </div>
+        <div>
+          <h1 className="text-lg font-semibold md:text-xl">
+            {getTitle()}
+          </h1>
+        </div>
       </div>
 
-      <h1 className="text-lg font-semibold md:text-xl">
-        {getTitle()}
-      </h1>
-
-      <div className="ml-auto">
+      <div className="ml-auto flex items-center gap-4">
+        <ConnectivityStatus />
+        
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
@@ -76,7 +80,7 @@ export default function Header() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{user?.email || 'Mon Compte'}</DropdownMenuLabel>
+            <DropdownMenuLabel className="max-w-[200px] truncate">{user?.email || 'Mon Compte'}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem disabled>Paramètres</DropdownMenuItem>
             <DropdownMenuItem disabled>Support</DropdownMenuItem>

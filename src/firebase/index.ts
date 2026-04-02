@@ -1,4 +1,3 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -9,7 +8,9 @@ import {
   getFirestore, 
   persistentLocalCache, 
   persistentMultipleTabManager,
-  Firestore 
+  Firestore,
+  enableIndexedDbPersistence,
+  terminate
 } from 'firebase/firestore';
 
 // Singleton pour éviter les doubles initialisations
@@ -25,7 +26,7 @@ export function initializeFirebase() {
     app = getApp();
   }
 
-  // Initialisation sécurisée de Firestore avec cache persistant
+  // Initialisation sécurisée de Firestore avec cache persistant IndexedDB
   if (!firestoreInstance) {
     try {
       firestoreInstance = initializeFirestore(app, {
@@ -33,9 +34,19 @@ export function initializeFirebase() {
           tabManager: persistentMultipleTabManager()
         })
       });
-    } catch (e) {
-      // En cas d'erreur (déjà initialisé), on récupère l'instance existante
-      firestoreInstance = getFirestore(app);
+      
+      // Note: enableIndexedDbPersistence est géré automatiquement par persistentLocalCache
+      // dans les versions récentes du SDK Firebase (v9+).
+    } catch (e: any) {
+      if (e.code === 'failed-precondition') {
+        // Plusieurs onglets ouverts simultanément
+        firestoreInstance = getFirestore(app);
+      } else if (e.code === 'unimplemented') {
+        // Le navigateur ne supporte pas IndexedDB
+        firestoreInstance = getFirestore(app);
+      } else {
+        firestoreInstance = getFirestore(app);
+      }
     }
   }
 
