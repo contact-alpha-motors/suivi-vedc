@@ -1,7 +1,7 @@
 {
-  "name": "VEDC Inventaire",
-  "short_name": "VEDC",
-  "description": "Application de suivi d'inventaire et de ventes hors ligne pour VEDC.",
+  "name": "Suivi d'Inventaire VEDC",
+  "short_name": "VEDC Inventaire",
+  "description": "Application de suivi d'inventaire et de ventes fonctionnant hors ligne.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -17,7 +17,21 @@
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Inventaire",
+      "url": "/inventory",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Ventes",
+      "url": "/sales",
+      "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192" }]
     }
   ]
 }
