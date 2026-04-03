@@ -1,0 +1,22 @@
+{
+  "placeholderImages": [
+    {
+      "id": "user-avatar",
+      "description": "User avatar",
+      "imageUrl": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHxwZXJzb24lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjYzOTEyMDB8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
+    },
+    {
+      "id": "pwa-icon-192",
+      "description": "Icône PWA 192x192",
+      "imageUrl": "https://picsum.photos/seed/vedc192/192/192",
+      "imageHint": "business icon"
+    },
+    {
+      "id": "pwa-icon-512",
+      "description": "Icône PWA 512x512",
+      "imageUrl": "https://picsum.photos/seed/vedc512/512/512",
+      "imageHint": "inventory management"
+    }
+  ]
+}

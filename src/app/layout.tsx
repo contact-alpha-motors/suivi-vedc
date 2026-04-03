@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  icons: {
+    icon: 'https://picsum.photos/seed/vedc192/192/192',
+    shortcut: 'https://picsum.photos/seed/vedc192/192/192',
+    apple: 'https://picsum.photos/seed/vedc192/192/192',
+  },
 };
 
 export const viewport: Viewport = {
@@ -39,7 +44,6 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&display=swap" rel="stylesheet" />
-        <link rel="manifest" href="/manifest.json" /> 
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         <FirebaseClientProvider>
