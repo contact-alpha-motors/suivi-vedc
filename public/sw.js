@@ -1,15 +1,12 @@
-
-const CACHE_NAME = 'vedc-inventory-v1';
+const CACHE_NAME = 'vedc-inventory-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/login',
   '/inventory',
   '/sales',
   '/events',
-  '/globals.css',
 ];
 
-// Installation : Mise en cache des ressources statiques de base
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
@@ -19,7 +16,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activation : Nettoyage des anciens caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -35,32 +31,33 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Interception des requêtes : Stratégie Stale-While-Revalidate
 self.addEventListener('fetch', (event) => {
-  // On ne met pas en cache les requêtes vers Firebase ou les API externes
-  if (event.request.url.includes('firestore.googleapis.com') || 
-      event.request.url.includes('firebaseinstallations.googleapis.com') ||
-      event.request.url.includes('identitytoolkit.googleapis.com')) {
+  // Ignorer les requêtes vers Firebase et l'auth pour laisser Firebase gérer son propre cache
+  if (
+    event.request.url.includes('firestore.googleapis.com') ||
+    event.request.url.includes('identitytoolkit.googleapis.com') ||
+    event.request.url.includes('securetoken.googleapis.com')
+  ) {
     return;
   }
 
   event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((response) => {
-        const fetchPromise = fetch(event.request).then((networkResponse) => {
-          // On ne met en cache que les requêtes réussies (GET)
-          if (event.request.method === 'GET' && networkResponse.status === 200) {
-            cache.put(event.request, networkResponse.clone());
-          }
-          return networkResponse;
-        }).catch(() => {
-          // Si le réseau échoue et qu'on n'a rien en cache pour une navigation, on renvoie l'index
-          if (event.request.mode === 'navigate') {
-            return cache.match('/');
-          }
-        });
-        return response || fetchPromise;
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request).then((fetchResponse) => {
+        // Ne mettre en cache que les requêtes GET réussies
+        if (event.request.method === 'GET' && fetchResponse.status === 200) {
+          const responseToCache = fetchResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        return fetchResponse;
       });
+    }).catch(() => {
+      // Si on est hors ligne et que la ressource n'est pas en cache, on retourne la page d'accueil
+      if (event.request.mode === 'navigate') {
+        return caches.match('/');
+      }
     })
   );
 });
