@@ -4,16 +4,16 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { IDataService } from './interfaces/data-service.interface';
 import { OfflineFirstService } from './implementations/offline-first-service';
-import { MockApiProvider } from './providers/mock-api-provider';
+import { FirebaseApiProvider } from './providers/firebase-api-provider';
 
 const DataServiceContext = createContext<IDataService | undefined>(undefined);
 
 export const DataServiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Injection de dépendance : on assemble le cerveau (OfflineFirstService) 
-  // avec ses muscles (MockApiProvider).
-  // Pour passer à Flask plus tard, il suffira de remplacer MockApiProvider par FlaskApiProvider.
+  // Injection de dépendance : On assemble le cerveau (OfflineFirstService) 
+  // avec ses muscles réels (FirebaseApiProvider).
+  // Pour passer à Flask plus tard, il suffira de remplacer FirebaseApiProvider par FlaskApiProvider.
   const service = useMemo(() => {
-    const apiProvider = new MockApiProvider();
+    const apiProvider = new FirebaseApiProvider();
     return new OfflineFirstService(apiProvider);
   }, []);
 
