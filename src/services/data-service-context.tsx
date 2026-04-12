@@ -3,13 +3,13 @@
 
 import React, { createContext, useContext, useMemo } from 'react';
 import { IDataService } from './interfaces/data-service.interface';
-import { MockDataService } from './implementations/mock-data-service';
+import { OfflineFirstService } from './implementations/offline-first-service';
 
 const DataServiceContext = createContext<IDataService | undefined>(undefined);
 
 export const DataServiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Pour l'instant, nous injectons l'implémentation Mock
-  const service = useMemo(() => new MockDataService(), []);
+  // Utilisation du service Offline First réel
+  const service = useMemo(() => new OfflineFirstService(), []);
 
   return (
     <DataServiceContext.Provider value={service}>
