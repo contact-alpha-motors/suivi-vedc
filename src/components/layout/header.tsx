@@ -34,6 +34,7 @@ export default function Header() {
   const { toast } = useToast();
 
   const handleLogout = async () => {
+    if (!auth) return;
     try {
       await signOut(auth);
       toast({ title: 'Déconnexion réussie.' });
@@ -74,7 +75,11 @@ export default function Header() {
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="rounded-full">
               <Avatar>
-                {userAvatar && <AvatarImage asChild src={userAvatar.imageUrl}><Image src={userAvatar.imageUrl} width={40} height={40} alt="User Avatar" data-ai-hint={userAvatar.imageHint}/></AvatarImage>}
+                {userAvatar && (
+                  <AvatarImage asChild src={userAvatar.imageUrl}>
+                    <Image src={userAvatar.imageUrl} width={40} height={40} alt="User Avatar" data-ai-hint={userAvatar.imageHint}/>
+                  </AvatarImage>
+                )}
                 <AvatarFallback>{getInitials(user?.email)}</AvatarFallback>
               </Avatar>
             </Button>
@@ -85,7 +90,7 @@ export default function Header() {
             <DropdownMenuItem disabled>Paramètres</DropdownMenuItem>
             <DropdownMenuItem disabled>Support</DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>Se déconnecter</DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout} disabled={!auth}>Se déconnecter</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

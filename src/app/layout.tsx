@@ -1,4 +1,3 @@
-
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import AppLayout from '@/components/layout/app-layout';
@@ -11,7 +10,7 @@ import Script from 'next/script';
 export const metadata: Metadata = {
   title: 'Suivi d\'Inventaire VEDC',
   description: 'Application de suivi d\'inventaire et de ventes hors ligne.',
-  manifest: '/manifest.json',
+  manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',

@@ -1,9 +1,8 @@
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
 import type { Item, Sale, Event } from '@/lib/types';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartConfig } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
@@ -26,6 +25,7 @@ export default function DashboardClient() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    if (!dataService) return;
     const unsubItems = dataService.subscribeToItems(setItems);
     const unsubSales = dataService.subscribeToSales(setSales);
     const unsubEvents = dataService.subscribeToEvents(data => {
@@ -56,7 +56,7 @@ export default function DashboardClient() {
     return [...events].sort((a, b) => b.date.getTime() - a.date.getTime())[0];
   }, [events]);
 
-  if (isLoading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
+  if (!dataService || isLoading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <div className="grid gap-6">

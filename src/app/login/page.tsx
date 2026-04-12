@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState } from 'react';
@@ -29,6 +28,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleAuth = async (isSignUp: boolean) => {
+    if (!auth) return;
     if (!email || !password) {
       toast({
         variant: 'destructive',
@@ -52,7 +52,6 @@ export default function LoginPage() {
           description: 'Connexion réussie.',
         });
       }
-      // La redirection sera gérée par le AuthGuard
     } catch (error: any) {
       toast({
         variant: 'destructive',
@@ -109,7 +108,7 @@ export default function LoginPage() {
                         required
                         />
                     </div>
-                    <Button onClick={() => handleAuth(false)} className="w-full" disabled={isLoading}>
+                    <Button onClick={() => handleAuth(false)} className="w-full" disabled={isLoading || !auth}>
                         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Se connecter'}
                     </Button>
                     </CardContent>
@@ -145,7 +144,7 @@ export default function LoginPage() {
                         required
                         />
                     </div>
-                    <Button onClick={() => handleAuth(true)} className="w-full" disabled={isLoading}>
+                    <Button onClick={() => handleAuth(true)} className="w-full" disabled={isLoading || !auth}>
                         {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'S\'inscrire'}
                     </Button>
                     </CardContent>

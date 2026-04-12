@@ -1,4 +1,3 @@
-
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -16,23 +15,37 @@ let firestoreInstance: Firestore | null = null;
 let authInstance: Auth | null = null;
 let appInstance: FirebaseApp | null = null;
 
+/**
+ * Initializes Firebase services safely for both SSR and Client.
+ * On server, it returns null values to avoid illegal browser API calls.
+ */
 export function initializeFirebase() {
+  if (typeof window === 'undefined') {
+    return {
+      firebaseApp: null,
+      auth: null,
+      firestore: null
+    };
+  }
+
   if (!appInstance) {
-    if (!getApps().length) {
-      appInstance = initializeApp(firebaseConfig);
-    } else {
+    try {
+      appInstance = getApps().length ? getApp() : initializeApp(firebaseConfig);
+    } catch (e) {
       appInstance = getApp();
     }
   }
 
   if (!firestoreInstance) {
     try {
+      // Attempt to initialize with persistent cache for offline-first support
       firestoreInstance = initializeFirestore(appInstance, {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager()
         })
       });
     } catch (e: any) {
+      // If already initialized (common in HMR), retrieve existing instance
       firestoreInstance = getFirestore(appInstance);
     }
   }

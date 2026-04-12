@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { createContext, useContext, useMemo } from 'react';
@@ -6,10 +5,12 @@ import { IDataService } from './interfaces/data-service.interface';
 import { OfflineFirstService } from './implementations/offline-first-service';
 import { FirebaseApiProvider } from './providers/firebase-api-provider';
 
-const DataServiceContext = createContext<IDataService | undefined>(undefined);
+const DataServiceContext = createContext<IDataService | null>(null);
 
 export const DataServiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const service = useMemo(() => {
+    if (typeof window === 'undefined') return null;
+    
     try {
       const apiProvider = new FirebaseApiProvider();
       return new OfflineFirstService(apiProvider);
@@ -18,10 +19,6 @@ export const DataServiceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       return null;
     }
   }, []);
-
-  if (!service) {
-    return <>{children}</>;
-  }
 
   return (
     <DataServiceContext.Provider value={service}>
@@ -32,8 +29,6 @@ export const DataServiceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
 export const useDataService = () => {
   const context = useContext(DataServiceContext);
-  if (!context) {
-    throw new Error('useDataService must be used within a DataServiceProvider');
-  }
+  // Retourne null au lieu de throw pour la compatibilité SSR
   return context;
 };
