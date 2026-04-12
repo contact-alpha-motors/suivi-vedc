@@ -1,4 +1,3 @@
-
 'use client';
 
 import { IDataService, SyncStatus } from '../interfaces/data-service.interface';
@@ -18,27 +17,26 @@ export class OfflineFirstService implements IDataService {
 
   constructor(apiProvider: IApiProvider) {
     this.apiProvider = apiProvider;
-    this.setupConnectivityListener();
-    this.startBackgroundSync();
-  }
-
-  private setupConnectivityListener() {
+    
+    // Initialisation sécurisée pour le navigateur
     if (typeof window !== 'undefined') {
       this.isOnline = navigator.onLine;
-      window.addEventListener('online', () => {
-        this.isOnline = true;
-        this.processOutbox();
-        this.syncWithRemote();
-      });
-      window.addEventListener('offline', () => {
-        this.isOnline = false;
-      });
+      this.setupConnectivityListener();
+      this.startBackgroundSync();
     }
   }
 
-  /**
-   * Lance une synchronisation périodique du distant vers le local.
-   */
+  private setupConnectivityListener() {
+    window.addEventListener('online', () => {
+      this.isOnline = true;
+      this.processOutbox();
+      this.syncWithRemote();
+    });
+    window.addEventListener('offline', () => {
+      this.isOnline = false;
+    });
+  }
+
   private startBackgroundSync() {
     // Sync initiale
     this.syncWithRemote();
@@ -48,9 +46,6 @@ export class OfflineFirstService implements IDataService {
     }, 60000);
   }
 
-  /**
-   * Récupère les données distantes pour mettre à jour le cache local.
-   */
   private async syncWithRemote() {
     if (!this.isOnline) return;
 
@@ -62,7 +57,6 @@ export class OfflineFirstService implements IDataService {
         this.apiProvider.fetchEventStocks()
       ]);
 
-      // Mise à jour atomique du cache local (Dexie)
       await db.transaction('rw', db.items, db.events, db.sales, db.eventStocks, async () => {
         await db.items.bulkPut(items);
         await db.events.bulkPut(events);
@@ -74,10 +68,9 @@ export class OfflineFirstService implements IDataService {
     }
   }
 
-  /**
-   * Envoie les modifications locales (Outbox) vers le distant.
-   */
   private async processOutbox() {
+    if (!this.isOnline) return;
+    
     const pending = await db.outbox.orderBy('timestamp').toArray();
     if (pending.length === 0) return;
 
@@ -112,10 +105,9 @@ export class OfflineFirstService implements IDataService {
     }
   }
 
-  // --- Implémentation IDataService (Consommée par l'UI) ---
-
   subscribeToSyncStatus(callback: (status: SyncStatus) => void): () => void {
-    const unsub = liveQuery(() => db.outbox.count()).subscribe((count) => {
+    const observable = liveQuery(() => db.outbox.count());
+    const subscription = observable.subscribe((count) => {
       callback({
         isOnline: this.isOnline,
         isSyncing: false,
@@ -123,7 +115,7 @@ export class OfflineFirstService implements IDataService {
         lastSyncedAt: new Date()
       });
     });
-    return () => unsub.unsubscribe();
+    return () => subscription.unsubscribe();
   }
 
   async getItems(): Promise<Item[]> {

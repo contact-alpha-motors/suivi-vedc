@@ -1,4 +1,3 @@
-
 import Dexie, { type Table } from 'dexie';
 import type { Item, Sale, Event, EventStock } from '@/lib/types';
 
@@ -29,4 +28,5 @@ export class AppDatabase extends Dexie {
   }
 }
 
+// Création d'une instance unique. Dexie est safe en SSR tant qu'on n'ouvre pas la DB.
 export const db = new AppDatabase();
