@@ -1,65 +1,34 @@
+
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import type { Item } from '@/lib/types';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, PlusCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import {
-  addItem,
-  updateItem,
-  deleteItem as deleteItemAction,
-} from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection } from 'firebase/firestore';
-
+import { useDataService } from '@/services/data-service-context';
 
 export default function InventoryClient() {
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-
-  const itemsQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'inventoryItems') : null),
-    [firestore, user]
-  );
-  const { data: items, isLoading: itemsLoading } = useCollection<Item>(itemsQuery);
-
+  const dataService = useDataService();
+  const [items, setItems] = useState<Item[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const { toast } = useToast();
+
+  useEffect(() => {
+    return dataService.subscribeToItems(data => {
+      setItems(data);
+      setIsLoading(false);
+    });
+  }, [dataService]);
 
   const handleOpenDialog = (item: Item | null) => {
     setEditingItem(item);
@@ -68,17 +37,10 @@ export default function InventoryClient() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteItemAction(id);
-      toast({
-        title: 'Succès',
-        description: "L'article a été supprimé.",
-      });
+      await dataService.removeItem(id);
+      toast({ title: 'Succès', description: "L'article a été supprimé." });
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: 'Impossible de supprimer l\'article.',
-      });
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de supprimer l\'article.' });
     }
   };
 
@@ -97,28 +59,15 @@ export default function InventoryClient() {
     };
 
     try {
-      if (editingItem) {
-        await updateItem({ ...itemData, id: editingItem.id });
-        toast({ title: 'Succès', description: 'Article mis à jour.' });
-      } else {
-        await addItem(itemData);
-        toast({ title: 'Succès', description: 'Article ajouté.' });
-      }
+      await dataService.saveItem(editingItem ? { ...itemData, id: editingItem.id } : itemData);
+      toast({ title: 'Succès', description: editingItem ? 'Article mis à jour.' : 'Article ajouté.' });
       setIsDialogOpen(false);
     } catch (error) {
-      toast({
-        variant: 'destructive',
-        title: 'Erreur',
-        description: 'Impossible de sauvegarder l\'article.',
-      });
+      toast({ variant: 'destructive', title: 'Erreur', description: 'Impossible de sauvegarder l\'article.' });
     }
   };
   
-  const isLoading = isUserLoading || itemsLoading;
-
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  }
+  if (isLoading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <>
@@ -127,9 +76,7 @@ export default function InventoryClient() {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle>Gestion du Stock</CardTitle>
-              <CardDescription>
-                Ajoutez, modifiez ou supprimez des articles de votre inventaire.
-              </CardDescription>
+              <CardDescription>Ajoutez, modifiez ou supprimez des articles de votre inventaire.</CardDescription>
             </div>
             <Button onClick={() => handleOpenDialog(null)}>
               <PlusCircle className="mr-2 h-4 w-4" /> Ajouter un article
@@ -141,42 +88,23 @@ export default function InventoryClient() {
             <TableHeader>
               <TableRow>
                 <TableHead>Nom</TableHead>
-                <TableHead>Description</TableHead>
                 <TableHead className="text-right">Prix</TableHead>
                 <TableHead className="text-right">Stock Actuel</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items?.map((item) => (
+              {items.map((item) => (
                 <TableRow key={item.id}>
                   <TableCell className="font-medium">{item.name}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-sm truncate">{item.description}</TableCell>
-                  <TableCell className="text-right">
-                    {item.price.toLocaleString('fr-CM', {
-                      style: 'currency',
-                      currency: 'XAF',
-                    })}
-                  </TableCell>
+                  <TableCell className="text-right">{item.price.toLocaleString('fr-CM', { style: 'currency', currency: 'XAF' })}</TableCell>
                   <TableCell className="text-right">{item.currentQuantity}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Ouvrir le menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleOpenDialog(item)}>
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          Supprimer
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenDialog(item)}>Modifier</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>Supprimer</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -191,12 +119,7 @@ export default function InventoryClient() {
         <DialogContent className="sm:max-w-lg">
           <form onSubmit={handleSave}>
             <DialogHeader>
-              <DialogTitle>
-                {editingItem ? 'Modifier l\'article' : 'Ajouter un nouvel article'}
-              </DialogTitle>
-              <DialogDescription>
-                Remplissez les détails de l'article ci-dessous.
-              </DialogDescription>
+              <DialogTitle>{editingItem ? 'Modifier l\'article' : 'Ajouter un nouvel article'}</DialogTitle>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
@@ -212,18 +135,11 @@ export default function InventoryClient() {
                 <Input id="price" name="price" type="number" step="0.01" defaultValue={editingItem?.price} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="initialQuantity" className="text-right">Quantité initiale</Label>
+                <Label htmlFor="initialQuantity" className="text-right">Qté initiale</Label>
                 <Input id="initialQuantity" name="initialQuantity" type="number" defaultValue={editingItem?.initialQuantity} className="col-span-3" disabled={!!editingItem} required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="lowStockThreshold" className="text-right">Seuil d'alerte</Label>
-                <Input id="lowStockThreshold" name="lowStockThreshold" type="number" defaultValue={editingItem?.lowStockThreshold ?? 5} className="col-span-3" required />
               </div>
             </div>
             <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="secondary">Annuler</Button>
-              </DialogClose>
               <Button type="submit">Sauvegarder</Button>
             </DialogFooter>
           </form>

@@ -1,9 +1,11 @@
+
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import AppLayout from '@/components/layout/app-layout';
 import { Toaster } from "@/components/ui/toaster";
 import { FirebaseClientProvider } from '@/firebase';
 import AuthGuard from '@/components/layout/auth-guard';
+import { DataServiceProvider } from '@/services/data-service-context';
 import Script from 'next/script';
 
 export const metadata: Metadata = {
@@ -47,11 +49,13 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
         <FirebaseClientProvider>
-          <AuthGuard>
-            <AppLayout>
-              {children}
-            </AppLayout>
-          </AuthGuard>
+          <DataServiceProvider>
+            <AuthGuard>
+              <AppLayout>
+                {children}
+              </AppLayout>
+            </AuthGuard>
+          </DataServiceProvider>
         </FirebaseClientProvider>
         <Toaster />
         <Script id="register-sw" strategy="afterInteractive">

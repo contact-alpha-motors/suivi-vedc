@@ -1,4 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
 
 export interface Item {
   id: string;
@@ -6,12 +5,12 @@ export interface Item {
   description: string;
   price: number;
   initialQuantity: number;
-  currentQuantity: number; // This is now central stock
+  currentQuantity: number;
   lowStockThreshold: number;
 }
 
 export interface EventStock {
-  id: string; // Composite key `${eventId}_${itemId}` in Firestore
+  id: string;
   eventId: string;
   itemId: string;
   allocatedQuantity: number;
@@ -21,8 +20,8 @@ export interface Sale {
   id: string;
   itemId: string;
   quantity: number;
-  salePrice: number; // price at time of sale * quantity
-  timestamp: Timestamp;
+  salePrice: number;
+  timestamp: Date;
   eventId?: string;
 }
 
@@ -30,6 +29,6 @@ export interface Event {
   id: string;
   name: string;
   location: string;
-  date: Timestamp;
+  date: Date;
   administrator: string;
 }

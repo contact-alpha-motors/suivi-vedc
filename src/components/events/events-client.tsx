@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Event } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -11,28 +11,27 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, PlusCircle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { addEvent, updateEvent, deleteEvent as deleteEventAction } from '@/lib/data';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
-import { collection, Timestamp } from 'firebase/firestore';
+import { useDataService } from '@/services/data-service-context';
 
 export default function EventsClient() {
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-
-  const eventsQuery = useMemoFirebase(
-    () => (firestore && user ? collection(firestore, 'events') : null),
-    [firestore, user]
-  );
-  const { data: events, isLoading: eventsLoading } = useCollection<Event>(eventsQuery);
-
+  const dataService = useDataService();
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const { toast } = useToast();
   const router = useRouter();
+
+  useEffect(() => {
+    return dataService.subscribeToEvents(data => {
+      setEvents(data);
+      setIsLoading(false);
+    });
+  }, [dataService]);
 
   const handleOpenDialog = (event: Event | null) => {
     setEditingEvent(event);
@@ -41,7 +40,7 @@ export default function EventsClient() {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteEventAction(id);
+      await dataService.removeEvent(id);
       toast({ title: 'Succès', description: "L'événement a été supprimé." });
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de supprimer l'événement." });
@@ -56,45 +55,26 @@ export default function EventsClient() {
     const eventData = {
         name: data.name,
         location: data.location,
-        date: new Date(data.date), // Sera converti en Timestamp par addEvent/updateEvent
+        date: new Date(data.date),
         administrator: data.administrator,
     };
 
     try {
-      if (editingEvent) {
-        await updateEvent({ ...eventData, id: editingEvent.id });
-        toast({ title: 'Succès', description: 'Événement mis à jour.' });
-      } else {
-        await addEvent(eventData);
-        toast({ title: 'Succès', description: 'Événement ajouté.' });
-      }
+      await dataService.saveEvent(editingEvent ? { ...eventData, id: editingEvent.id } : eventData);
+      toast({ title: 'Succès', description: editingEvent ? 'Événement mis à jour.' : 'Événement ajouté.' });
       setIsDialogOpen(false);
-      setEditingEvent(null);
     } catch (error) {
       toast({ variant: 'destructive', title: 'Erreur', description: "Impossible de sauvegarder l'événement." });
     }
   };
   
-  const editingDateValue = editingEvent?.date ? format(editingEvent.date.toDate(), "yyyy-MM-dd") : '';
+  const editingDateValue = editingEvent?.date ? format(editingEvent.date, "yyyy-MM-dd") : '';
 
-  const handleRowClick = (eventId: string) => {
-    router.push(`/events/${eventId}`);
-  };
-  
   const sortedEvents = useMemo(() => {
-    if (!events) return [];
-    return [...events].sort((a, b) => {
-      const dateA = a.date instanceof Timestamp ? a.date.toMillis() : 0;
-      const dateB = b.date instanceof Timestamp ? b.date.toMillis() : 0;
-      return dateB - dateA;
-    });
+    return [...events].sort((a, b) => b.date.getTime() - a.date.getTime());
   }, [events]);
 
-  const isLoading = isUserLoading || eventsLoading;
-
-  if (isLoading) {
-    return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
-  }
+  if (isLoading) return <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>;
 
   return (
     <>
@@ -103,13 +83,9 @@ export default function EventsClient() {
           <div className="flex justify-between items-start">
             <div>
               <CardTitle>Gestion des Événements</CardTitle>
-              <CardDescription>
-                Cliquez sur un événement pour voir les détails et enregistrer les ventes.
-              </CardDescription>
+              <CardDescription>Cliquez sur un événement pour gérer les stocks et ventes.</CardDescription>
             </div>
-            <Button onClick={() => handleOpenDialog(null)}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Ajouter un événement
-            </Button>
+            <Button onClick={() => handleOpenDialog(null)}><PlusCircle className="mr-2 h-4 w-4" /> Ajouter</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -119,47 +95,21 @@ export default function EventsClient() {
                 <TableHead>Nom</TableHead>
                 <TableHead>Lieu</TableHead>
                 <TableHead>Date</TableHead>
-                <TableHead>Administrateur</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sortedEvents.map((event) => (
-                <TableRow 
-                  key={event.id} 
-                  onClick={() => handleRowClick(event.id)}
-                  className="cursor-pointer"
-                >
+                <TableRow key={event.id} onClick={() => router.push(`/events/${event.id}`)} className="cursor-pointer">
                   <TableCell className="font-medium">{event.name}</TableCell>
                   <TableCell>{event.location}</TableCell>
-                  <TableCell>
-                    {event.date instanceof Timestamp 
-                      ? format(event.date.toDate(), 'dd MMMM yyyy', { locale: fr })
-                      : 'Date invalide'}
-                  </TableCell>
-                  <TableCell>{event.administrator}</TableCell>
+                  <TableCell>{format(event.date, 'dd MMMM yyyy', { locale: fr })}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button 
-                          variant="ghost" 
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <span className="sr-only">Ouvrir le menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
+                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                       <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                        <DropdownMenuItem onClick={() => handleOpenDialog(event)}>
-                          Modifier
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={() => handleDelete(event.id)}
-                        >
-                          Supprimer
-                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenDialog(event)}>Modifier</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(event.id)}>Supprimer</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -173,38 +123,18 @@ export default function EventsClient() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <form onSubmit={handleSave}>
-            <DialogHeader>
-              <DialogTitle>
-                {editingEvent ? 'Modifier l\'événement' : 'Ajouter un nouvel événement'}
-              </DialogTitle>
-              <DialogDescription>
-                Remplissez les détails de l'événement.
-              </DialogDescription>
-            </DialogHeader>
+            <DialogHeader><DialogTitle>{editingEvent ? 'Modifier' : 'Ajouter'} événement</DialogTitle></DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">Nom</Label>
                 <Input id="name" name="name" defaultValue={editingEvent?.name} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="location" className="text-right">Lieu</Label>
-                <Input id="location" name="location" defaultValue={editingEvent?.location} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="date" className="text-right">Date</Label>
                 <Input id="date" name="date" type="date" defaultValue={editingDateValue} className="col-span-3" required />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="administrator" className="text-right">Admin</Label>
-                <Input id="administrator" name="administrator" defaultValue={editingEvent?.administrator} className="col-span-3" required />
-              </div>
             </div>
-            <DialogFooter>
-              <DialogClose asChild>
-                <Button type="button" variant="secondary" onClick={() => setEditingEvent(null)}>Annuler</Button>
-              </DialogClose>
-              <Button type="submit">Sauvegarder</Button>
-            </DialogFooter>
+            <DialogFooter><Button type="submit">Sauvegarder</Button></DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
