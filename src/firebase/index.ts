@@ -1,3 +1,4 @@
+
 'use client';
 
 import { firebaseConfig } from '@/firebase/config';
@@ -11,39 +12,37 @@ import {
   Firestore,
 } from 'firebase/firestore';
 
-// Singleton pour éviter les doubles initialisations
 let firestoreInstance: Firestore | null = null;
 let authInstance: Auth | null = null;
+let appInstance: FirebaseApp | null = null;
 
 export function initializeFirebase() {
-  let app: FirebaseApp;
-  
-  if (!getApps().length) {
-    app = initializeApp(firebaseConfig);
-  } else {
-    app = getApp();
+  if (!appInstance) {
+    if (!getApps().length) {
+      appInstance = initializeApp(firebaseConfig);
+    } else {
+      appInstance = getApp();
+    }
   }
 
-  // Initialisation sécurisée de Firestore avec cache persistant IndexedDB
   if (!firestoreInstance) {
     try {
-      firestoreInstance = initializeFirestore(app, {
+      firestoreInstance = initializeFirestore(appInstance, {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager()
         })
       });
     } catch (e: any) {
-      // Si déjà initialisé ou autre erreur, on récupère l'instance existante
-      firestoreInstance = getFirestore(app);
+      firestoreInstance = getFirestore(appInstance);
     }
   }
 
   if (!authInstance) {
-    authInstance = getAuth(app);
+    authInstance = getAuth(appInstance);
   }
 
   return {
-    firebaseApp: app,
+    firebaseApp: appInstance,
     auth: authInstance,
     firestore: firestoreInstance
   };

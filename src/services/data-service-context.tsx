@@ -9,13 +9,19 @@ import { FirebaseApiProvider } from './providers/firebase-api-provider';
 const DataServiceContext = createContext<IDataService | undefined>(undefined);
 
 export const DataServiceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Injection de dépendance : On assemble le cerveau (OfflineFirstService) 
-  // avec ses muscles réels (FirebaseApiProvider).
-  // Pour passer à Flask plus tard, il suffira de remplacer FirebaseApiProvider par FlaskApiProvider.
   const service = useMemo(() => {
-    const apiProvider = new FirebaseApiProvider();
-    return new OfflineFirstService(apiProvider);
+    try {
+      const apiProvider = new FirebaseApiProvider();
+      return new OfflineFirstService(apiProvider);
+    } catch (error) {
+      console.error('Failed to initialize DataService:', error);
+      return null;
+    }
   }, []);
+
+  if (!service) {
+    return <>{children}</>;
+  }
 
   return (
     <DataServiceContext.Provider value={service}>
